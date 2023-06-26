@@ -1,1 +1,0 @@
-# Game Review Web Application 🎯
