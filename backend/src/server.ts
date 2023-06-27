@@ -1,19 +1,21 @@
-import express, { Request, Response } from 'express';
-import cors from 'cors';
-import bodyParser from 'body-parser';
+import express from 'express'
+import cors from 'cors'
 
-const app = express();
+const app = express()
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
+// Set up CORS
+app.use(
+  cors({
+    origin: 'http://localhost:3000', // allow to server to accept request from different origin
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true, // allow session cookie from browser to pass through
+  })
+)
 
-// Example route
-app.get('/', (req: Request, res: Response) => {
-  res.send('Hello from the server!');
-});
+app.get('/', (req, res) => {
+  res.send('Hello from the server!')
+})
 
-// Server listening
-const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => console.log(`Server started on port ${PORT}`));
-
+app.listen(5001, () => {
+  console.log('Server is running on port 5001')
+})
