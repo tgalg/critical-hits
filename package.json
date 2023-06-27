@@ -1,0 +1,11 @@
+{
+  "name": "critical-hits",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/tgalg/critical-hits.git",
+  "author": "tgalg <thomasxgallagher@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "vercel": "^30.2.3"
+  }
+}
