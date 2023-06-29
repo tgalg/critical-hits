@@ -7,7 +7,7 @@ const port = process.env.PORT || 5001
 // Set up CORS
 app.use(
   cors({
-    origin: 'http://localhost:3000', // allow to server to accept request from different origin
+    origin: 'https://critical-hits-frontend.vercel.app/', // allow server to accept request from different origin
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true, // allow session cookie from browser to pass through
   })
