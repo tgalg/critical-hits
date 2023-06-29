@@ -2,6 +2,7 @@ import express from 'express'
 import cors from 'cors'
 
 const app = express()
+const port = process.env.PORT || 5001
 
 // Set up CORS
 app.use(
@@ -16,6 +17,6 @@ app.get('/', (req, res) => {
   res.send('Hello from the server!')
 })
 
-app.listen(5001, () => {
+app.listen(port, () => {
   console.log('Server is running on port 5001')
 })
