@@ -135,7 +135,7 @@ export function Feed({
                   <ReviewBody body={entry.review.body} />
                 </div>
               ))}
-            <p className="flex items-center gap-3">
+            <div className="flex items-center gap-3">
               <time
                 dateTime={entry.createdAt.toISOString()}
                 className="text-xs text-muted-foreground"
@@ -164,7 +164,7 @@ export function Feed({
                   label={entry.list.title}
                 />
               )}
-            </p>
+            </div>
           </div>
         </li>
       ))}
