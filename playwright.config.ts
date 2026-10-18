@@ -26,8 +26,9 @@ export default defineConfig({
     command:
       "node node_modules/next/dist/bin/next build && node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3100",
     url: baseURL,
-    // Auth must trust the test server's origin whatever .env says.
-    env: { BETTER_AUTH_URL: baseURL },
+    // Auth must trust the test server's origin whatever .env says, and the
+    // moderation spec signs in as this moderator.
+    env: { BETTER_AUTH_URL: baseURL, ADMIN_EMAILS: "moderator@e2e.test" },
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
   },

@@ -271,6 +271,7 @@ export async function getOwnedLog(db: Database, userId: string, logId: number) {
       gameId: logs.gameId,
       game: { slug: games.slug, title: games.title },
       review: reviewColumns,
+      reviewHidden: sql<boolean>`${reviews.hiddenAt} IS NOT NULL`,
     })
     .from(logs)
     .innerJoin(games, eq(games.id, logs.gameId))

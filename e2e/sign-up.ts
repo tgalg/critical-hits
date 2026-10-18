@@ -3,9 +3,13 @@ import { expect, type Page } from "@playwright/test";
 // Signs up a new player and waits for the account page. Better Auth allows
 // only a few sign-ups per address every 10 seconds, and parallel specs share
 // one address, so a rate-limited attempt waits out the window and retries.
-export async function signUp(page: Page, name: string) {
+export async function signUp(
+  page: Page,
+  name: string,
+  email = `${name}@example.com`,
+) {
   await page.goto("/sign-up");
-  await page.getByLabel("Email").fill(`${name}@example.com`);
+  await page.getByLabel("Email").fill(email);
   await page.getByLabel("Username").fill(name);
   await page.getByLabel("Password").fill("correct horse battery");
   const limited = page.locator("form p[role=alert]", {

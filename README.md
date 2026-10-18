@@ -102,13 +102,20 @@ The browser tests are run separately and is not part of `pnpm check`.
   a play logged with a review shows once, and hidden reviews and private
   lists stay out. Players like other players' reviews and public lists
   (`lib/social/likes.ts`); reviews keep a running `like_count`.
+- `lib/moderation/` and `app/admin/`: players report other players' reviews
+  (one report each, with a reason). Moderators open `/admin` from their
+  account page to hide a reported review, dismiss its reports, or restore a
+  hidden review; hidden reviews disappear from game pages, profiles and feeds,
+  and their author sees a note on the log. Moderators are listed by email in
+  `ADMIN_EMAILS` (comma-separated) and must have a verified email, such as one
+  from Discord sign-in; `/admin` is a 404 for everyone else.
 - `lib/auth.ts`: Better Auth server config mapped onto the `users`, `sessions`,
   `accounts` and `verifications` tables; `lib/auth-client.ts` is the browser
   client. The API lives at `app/api/auth/[...all]`, with pages at `/sign-up`,
   `/sign-in` and `/account`. Set `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` in
   `.env`; Discord sign-in turns on only when `DISCORD_CLIENT_ID` and
   `DISCORD_CLIENT_SECRET` are both set.
-- `e2e/`: Playwright smoke, auth, catalog, logging, backlog, lists, profile and feed tests (all but smoke need a migrated
+- `e2e/`: Playwright smoke, auth, catalog, logging, backlog, lists, profile, feed and moderation tests (all but smoke need a migrated
   `DATABASE_URL`), isolated from Vitest's `*.test.ts` discovery.
 - `drizzle.config.ts`: PostgreSQL migration configuration; requires `DATABASE_URL`.
 - `drizzle/`: generated migrations, starting with `0000_init.sql` (which also

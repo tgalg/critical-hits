@@ -11,6 +11,7 @@ import { getProfile, maxFavourites } from "@/lib/profile/service";
 import { getCurrentUser } from "@/lib/session";
 import { getFollowState } from "@/lib/social/service";
 import { FollowButton } from "@/components/social/follow-button";
+import { ReportButton } from "@/components/moderation/report-button";
 import { LikeButton } from "@/components/social/like-button";
 import { getLikedIds } from "@/lib/social/likes";
 
@@ -201,15 +202,23 @@ export default async function ProfilePage(props: PageProps<"/u/[username]">) {
                 ) : (
                   <ReviewBody body={review.body} />
                 )}
-                <LikeButton
-                  type="review"
-                  id={review.id}
-                  count={review.likeCount}
-                  liked={likedReviews.has(review.id)}
-                  canLike={!!viewer && !own}
-                  path={`/u/${user.username}`}
-                  label={`review of ${review.game.title}`}
-                />
+                <div className="flex flex-wrap items-start gap-4">
+                  <LikeButton
+                    type="review"
+                    id={review.id}
+                    count={review.likeCount}
+                    liked={likedReviews.has(review.id)}
+                    canLike={!!viewer && !own}
+                    path={`/u/${user.username}`}
+                    label={`review of ${review.game.title}`}
+                  />
+                  {viewer && !own && (
+                    <ReportButton
+                      reviewId={review.id}
+                      label={`review of ${review.game.title}`}
+                    />
+                  )}
+                </div>
               </li>
             ))}
           </ul>
