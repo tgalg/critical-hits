@@ -109,6 +109,16 @@ describe.skipIf(!hasTestDatabase)("likes", () => {
     expect(await db.$count(likes)).toBe(4);
   });
 
+  it("drops a deleted player's likes from review counts", async () => {
+    const id = await reviewId(
+      await createLog(db, "ana", hades, reviewed("Yes.")),
+    );
+    await setLike(db, "ben", "review", id, true);
+    await setLike(db, "cy", "review", id, true);
+    await db.delete(users).where(eq(users.id, "ben"));
+    expect(await getReviewLikeCount(db, id)).toBe(1);
+  });
+
   it("refuses own, hidden, private and missing targets", async () => {
     const id = await reviewId(
       await createLog(db, "ana", hades, reviewed("Yes.")),

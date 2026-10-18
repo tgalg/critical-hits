@@ -101,7 +101,8 @@ The browser tests are run separately and is not part of `pnpm check`.
   feed. Signed-in players see activity from the people they follow at `/`;
   a play logged with a review shows once, and hidden reviews and private
   lists stay out. Players like other players' reviews and public lists
-  (`lib/social/likes.ts`); reviews keep a running `like_count`.
+  (`lib/social/likes.ts`); reviews keep a running `like_count`, kept
+  in step by a trigger on `likes`.
 - `lib/moderation/` and `app/admin/`: players report other players' reviews
   (one report each, with a reason). Moderators open `/admin` from their
   account page to hide a reported review, dismiss its reports, or restore a
