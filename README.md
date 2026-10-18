@@ -111,6 +111,11 @@ The browser tests are run separately and is not part of `pnpm check`.
   and their author sees a note on the log. Moderators are listed by email in
   `ADMIN_EMAILS` (comma-separated) and must have a verified email, such as one
   from Discord sign-in; `/admin` is a 404 for everyone else.
+- `lib/invite.ts`: while `SIGNUP_INVITE_CODE` is set, new accounts (email or
+  Discord) need that code on `/sign-up`. A correct code sets a short-lived
+  cookie, and Better Auth's `validateUserInfo` hook in `lib/auth.ts` refuses
+  to create a user without it. Existing players sign in as usual; unset the
+  variable to open sign-ups.
 - `lib/limits.ts`: hourly posting limits on reviews, lists and reports, lower
   for accounts less than a day old, to slow spam from fresh sign-ups.
 - Profiles show a player's backlog unless they untick "Show my backlog on my

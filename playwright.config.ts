@@ -26,9 +26,14 @@ export default defineConfig({
     command:
       "node node_modules/next/dist/bin/next build && node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3100",
     url: baseURL,
-    // Auth must trust the test server's origin whatever .env says, and the
-    // moderation spec signs in as this moderator.
-    env: { BETTER_AUTH_URL: baseURL, ADMIN_EMAILS: "moderator@e2e.test" },
+    // Auth must trust the test server's origin whatever .env says, the
+    // moderation spec signs in as this moderator, and sign-ups need the
+    // invite code e2e/sign-up.ts types.
+    env: {
+      BETTER_AUTH_URL: baseURL,
+      ADMIN_EMAILS: "moderator@e2e.test",
+      SIGNUP_INVITE_CODE: "e2e-invite",
+    },
     reuseExistingServer: !process.env.CI,
     timeout: 300_000,
   },

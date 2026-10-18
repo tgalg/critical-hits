@@ -27,3 +27,32 @@ test("shows an error for a wrong password", async ({ page }) => {
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByRole("alert")).toBeVisible();
 });
+
+test("turns sign-ups away without the invite code", async ({
+  page,
+  request,
+}) => {
+  const name = `uninvited${Date.now()}`;
+  await page.goto("/sign-up");
+  await page.getByLabel("Email").fill(`${name}@example.com`);
+  await page.getByLabel("Username").fill(name);
+  await page.getByLabel("Password").fill("correct horse battery");
+  await page.getByLabel("Invite code").fill("not-the-code");
+  await page.getByRole("button", { name: "Sign up" }).click();
+  await expect(page.locator("form p[role=alert]")).toHaveText(
+    "That invite code isn't right.",
+  );
+
+  // Skipping the form doesn't skip the check.
+  const response = await request.post("/api/auth/sign-up/email", {
+    data: {
+      email: `${name}@example.com`,
+      username: name,
+      name,
+      password: "correct horse battery",
+    },
+    headers: { origin: "http://127.0.0.1:3100" },
+  });
+  expect(response.ok()).toBe(false);
+  expect(await response.text()).toContain("invite_required");
+});

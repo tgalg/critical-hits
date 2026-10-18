@@ -4,9 +4,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
+import { rememberInvite } from "@/app/sign-up/actions";
 import { authClient } from "@/lib/auth-client";
 
 type Mode = "sign-in" | "sign-up";
+
+const inviteMessages = {
+  "sign-up": "Enter your invite code first.",
+  "sign-in":
+    "Critical Hits is invite-only for now. Create your account on the sign-up page with your invite code.",
+};
+
+const wrongInvite = "That invite code isn't right.";
+
+// Better Auth reports a missing invite with this code (lib/invite.ts).
+const isInviteError = (error: { code?: string; message?: string }) =>
+  /invite_required/i.test(`${error.code ?? ""} ${error.message ?? ""}`);
 
 const inputClass =
   "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary";
@@ -28,13 +41,35 @@ function Field({
 export function AuthForm({
   mode,
   discordEnabled,
+  inviteRequired = false,
+  initialError = null,
 }: {
   mode: Mode;
   discordEnabled: boolean;
+  inviteRequired?: boolean;
+  // An error code a Discord sign-in redirected back with.
+  initialError?: string | null;
 }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    initialError === "invite_required"
+      ? inviteMessages[mode]
+      : initialError
+        ? "Discord sign-in failed. Try again."
+        : null,
+  );
   const [pending, setPending] = useState(false);
+  const [invite, setInvite] = useState("");
+  const askInvite = mode === "sign-up" && inviteRequired;
+
+  // Trades the typed invite for the cookie sign-up checks; false if wrong.
+  async function checkInvite() {
+    if (!askInvite) return true;
+    if (await rememberInvite(invite)) return true;
+    setError(wrongInvite);
+    setPending(false);
+    return false;
+  }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,6 +77,7 @@ export function AuthForm({
     const value = (name: string) => String(form.get(name) ?? "").trim();
     setPending(true);
     setError(null);
+    if (!(await checkInvite())) return;
     const password = String(form.get("password") ?? "");
     const result =
       mode === "sign-up"
@@ -62,7 +98,11 @@ export function AuthForm({
             });
     setPending(false);
     if (result.error) {
-      setError(result.error.message ?? "Something went wrong. Try again.");
+      setError(
+        isInviteError(result.error)
+          ? inviteMessages[mode]
+          : (result.error.message ?? "Something went wrong. Try again."),
+      );
       return;
     }
     router.push("/account");
@@ -75,9 +115,12 @@ export function AuthForm({
     setPending(true);
     setError(null);
     try {
+      if (!(await checkInvite())) return;
       const result = await authClient.signIn.social({
         provider: "discord",
         callbackURL: "/account",
+        // A refused sign-up comes back here with ?error=<code>.
+        errorCallbackURL: mode === "sign-up" ? "/sign-up" : "/sign-in",
       });
       if (result.error) {
         setError(result.error.message || "Discord sign-in failed. Try again.");
@@ -124,6 +167,15 @@ export function AuthForm({
                   autoComplete="name"
                   required={false}
                 />
+                {askInvite && (
+                  <Field
+                    label="Invite code"
+                    name="invite"
+                    autoComplete="off"
+                    value={invite}
+                    onChange={(event) => setInvite(event.target.value)}
+                  />
+                )}
               </>
             ) : (
               <Field

@@ -12,6 +12,8 @@ export async function signUp(
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Username").fill(name);
   await page.getByLabel("Password").fill("correct horse battery");
+  // The test server requires this invite (playwright.config.ts).
+  await page.getByLabel("Invite code").fill("e2e-invite");
   const limited = page.locator("form p[role=alert]", {
     hasText: "Too many requests",
   });

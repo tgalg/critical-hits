@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { isDiscordEnabled } from "@/lib/auth-providers";
 import { getDatabase } from "@/lib/db";
+import { hasInvite, inviteRejection } from "@/lib/invite";
 import { accounts, sessions, users, verifications } from "@/lib/db/schema";
 
 // Discord is the one social provider in the MVP; it is enabled only when its
@@ -60,6 +61,14 @@ export function createAuth(db: NodePgDatabase<any>) {
     user: {
       modelName: "users",
       fields: { name: "displayName", image: "avatarUrl" },
+      // New accounts need an invite while sign-ups are closed (lib/invite.ts).
+      validateUserInfo: ({ source }, context) => {
+        if (source.action !== "create-user") return;
+        const cookie =
+          context?.headers?.get("cookie") ??
+          context?.request?.headers.get("cookie");
+        if (!hasInvite(cookie)) return { error: inviteRejection };
+      },
     },
     session: { modelName: "sessions" },
     account: { modelName: "accounts" },
