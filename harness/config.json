@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "builder": "codex",
+  "reviewer": "claude",
+  "tools": {
+    "codex": {
+      "command": "C:\\Users\\chabo\\AppData\\Local\\OpenAI\\Codex\\bin\\e78bad9887fa50cf\\codex.exe",
+      "prefixArgs": [],
+      "model": null
+    },
+    "claude": {
+      "command": "claude",
+      "prefixArgs": [],
+      "model": null
+    }
+  },
+  "reviewMaxTurns": 40
+}
