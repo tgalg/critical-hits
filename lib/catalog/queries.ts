@@ -39,7 +39,11 @@ export async function getGameBySlug(db: Database, slug: string) {
     .limit(1);
   if (!game) return null;
   const gamePlatformRows = await db
-    .select({ name: platforms.name, abbreviation: platforms.abbreviation })
+    .select({
+      id: platforms.id,
+      name: platforms.name,
+      abbreviation: platforms.abbreviation,
+    })
     .from(gamePlatforms)
     .innerJoin(platforms, eq(platforms.id, gamePlatforms.platformId))
     .where(eq(gamePlatforms.gameId, game.id))

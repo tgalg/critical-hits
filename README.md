@@ -37,7 +37,7 @@ is no pnpm shim on PATH.
 | `pnpm test`                         | Run the Vitest unit suite once                                                                                                                |
 | `pnpm vitest run lib/utils.test.ts` | Run the sample unit test directly                                                                                                             |
 | `pnpm test:watch`                   | Watch unit tests                                                                                                                              |
-| `pnpm e2e`                          | Run the Chromium browser tests (auth and catalog need a migrated `DATABASE_URL`); builds and starts its own server on port 3100               |
+| `pnpm e2e`                          | Run the Chromium browser tests (all but the home page test need a migrated `DATABASE_URL`); builds and starts its own server on port 3100     |
 | `pnpm typecheck`                    | Generate Next.js types and run strict TypeScript checks                                                                                       |
 | `pnpm lint`                         | Check ESLint rules and Prettier formatting                                                                                                    |
 | `pnpm format`                       | Format application and root configuration files                                                                                               |
@@ -75,13 +75,21 @@ The browser tests are run separately and is not part of `pnpm check`.
   last two days, then continues the full backfill from the cursor saved in
   `sync_cursors`, so a new database fills itself over a few runs (or faster by
   pressing Run on the cron job in the Vercel dashboard).
+- `lib/logs/` and `app/logs/`: logging. A log is one play of a game (status,
+  platform, dates, hours, half-star rating, heart, replay flag), created from
+  the game page and edited at `/logs/<id>/edit`; `/diary` lists the signed-in
+  player's logs by the day they happened. `lib/logs/input.ts` validates the
+  form, and `lib/logs/service.ts` does every write in one transaction that
+  checks ownership, records a `logged` activity, takes the game off the
+  backlog and recomputes the game's average (each player's latest rating
+  counts once) under a lock on the game row.
 - `lib/auth.ts`: Better Auth server config mapped onto the `users`, `sessions`,
   `accounts` and `verifications` tables; `lib/auth-client.ts` is the browser
   client. The API lives at `app/api/auth/[...all]`, with pages at `/sign-up`,
   `/sign-in` and `/account`. Set `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` in
   `.env`; Discord sign-in turns on only when `DISCORD_CLIENT_ID` and
   `DISCORD_CLIENT_SECRET` are both set.
-- `e2e/`: Playwright smoke, auth and catalog tests (auth and catalog need a migrated
+- `e2e/`: Playwright smoke, auth, catalog and logging tests (all but smoke need a migrated
   `DATABASE_URL`), isolated from Vitest's `*.test.ts` discovery.
 - `drizzle.config.ts`: PostgreSQL migration configuration; requires `DATABASE_URL`.
 - `drizzle/`: generated migrations, starting with `0000_init.sql` (which also
