@@ -6,10 +6,12 @@ import { getGameBySlug, releaseYear, starRating } from "@/lib/catalog/queries";
 import { getDatabase } from "@/lib/db";
 import { BacklogButton } from "@/components/backlog/backlog-button";
 import { LogDetails } from "@/components/logs/log-details";
+import { AddToList } from "@/components/lists/add-to-list";
 import { GameReviews } from "@/components/logs/game-reviews";
 import { LogForm } from "@/components/logs/log-form";
 import { statusOptions } from "@/lib/logs/form-defaults";
 import { getBacklogEntry } from "@/lib/backlog/service";
+import { getUserLists } from "@/lib/lists/service";
 import { getGameReviews, getUserLogsForGame } from "@/lib/logs/service";
 import { getCurrentUser } from "@/lib/session";
 
@@ -27,12 +29,13 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
   if (!game) notFound();
   const stars = starRating(game.avgRating);
   const user = await getCurrentUser();
-  const [plays, backlogEntry] = user
+  const [plays, backlogEntry, lists] = user
     ? await Promise.all([
         getUserLogsForGame(getDatabase(), user.id, game.id),
         getBacklogEntry(getDatabase(), user.id, game.id),
+        getUserLists(getDatabase(), user.id),
       ])
-    : [[], null];
+    : [[], null, []];
   const reviews = await getGameReviews(getDatabase(), game.id);
 
   return (
@@ -85,6 +88,9 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
               platforms={game.platforms}
               entry={backlogEntry}
             />
+          )}
+          {user && (
+            <AddToList gameId={game.id} slug={game.slug} lists={lists} />
           )}
         </div>
       </div>

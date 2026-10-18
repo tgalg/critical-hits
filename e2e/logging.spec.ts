@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { Pool } from "pg";
+import { signUp } from "./sign-up";
 
 // Needs the app's database (DATABASE_URL, migrated); seeds one game directly.
 test.skip(!process.env.DATABASE_URL, "needs a migrated database");
@@ -35,12 +36,7 @@ test("logs a game, sees it in the diary, edits and deletes it", async ({
   await page.goto(`/games/${slug}`);
   await expect(page.getByText("to log this game.")).toBeVisible();
 
-  await page.goto("/sign-up");
-  await page.getByLabel("Email").fill(`${name}@example.com`);
-  await page.getByLabel("Username").fill(name);
-  await page.getByLabel("Password").fill("correct horse battery");
-  await page.getByRole("button", { name: "Sign up" }).click();
-  await expect(page).toHaveURL(/\/account$/);
+  await signUp(page, name);
 
   await page.goto(`/games/${slug}`);
   await page.getByLabel("Status").selectOption("finished");

@@ -6,7 +6,7 @@ export function SiteHeader() {
     <header className="border-b">
       <nav
         aria-label="Main"
-        className="mx-auto flex max-w-5xl items-center gap-4 px-6 py-3 text-sm sm:gap-6"
+        className="mx-auto flex max-w-5xl items-center gap-3 overflow-x-auto px-4 py-3 text-sm whitespace-nowrap sm:gap-6 sm:px-6"
       >
         <Link
           href="/"
@@ -22,6 +22,9 @@ export function SiteHeader() {
         </Link>
         <Link href="/backlog" className="hover:underline">
           Backlog
+        </Link>
+        <Link href="/lists" className="hover:underline">
+          Lists
         </Link>
         <Link href="/account" className="ml-auto hover:underline">
           Account
