@@ -4,9 +4,11 @@ import { notFound } from "next/navigation";
 import { GameCover } from "@/components/catalog/game-cover";
 import { getGameBySlug, releaseYear, starRating } from "@/lib/catalog/queries";
 import { getDatabase } from "@/lib/db";
+import { BacklogButton } from "@/components/backlog/backlog-button";
 import { LogDetails } from "@/components/logs/log-details";
 import { LogForm } from "@/components/logs/log-form";
 import { statusOptions } from "@/lib/logs/form-defaults";
+import { getBacklogEntry } from "@/lib/backlog/service";
 import { getUserLogsForGame } from "@/lib/logs/service";
 import { getCurrentUser } from "@/lib/session";
 
@@ -24,9 +26,12 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
   if (!game) notFound();
   const stars = starRating(game.avgRating);
   const user = await getCurrentUser();
-  const plays = user
-    ? await getUserLogsForGame(getDatabase(), user.id, game.id)
-    : [];
+  const [plays, backlogEntry] = user
+    ? await Promise.all([
+        getUserLogsForGame(getDatabase(), user.id, game.id),
+        getBacklogEntry(getDatabase(), user.id, game.id),
+      ])
+    : [[], null];
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
@@ -71,6 +76,14 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
             </ul>
           )}
           {game.summary && <p className="leading-relaxed">{game.summary}</p>}
+          {user && (
+            <BacklogButton
+              gameId={game.id}
+              slug={game.slug}
+              platforms={game.platforms}
+              entry={backlogEntry}
+            />
+          )}
         </div>
       </div>
 

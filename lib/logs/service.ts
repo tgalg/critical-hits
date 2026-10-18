@@ -3,13 +3,13 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   activities,
   backlogItems,
-  gamePlatforms,
   games,
   likes,
   logs,
   platforms,
   reviews,
 } from "@/lib/db/schema";
+import { gameHasPlatform } from "@/lib/catalog/queries";
 import type { LogInput } from "@/lib/logs/input";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
@@ -34,17 +34,9 @@ async function checkPlatform(
   platformId: number | null,
 ) {
   if (platformId === null) return;
-  const [link] = await tx
-    .select({ platformId: gamePlatforms.platformId })
-    .from(gamePlatforms)
-    .where(
-      and(
-        eq(gamePlatforms.gameId, gameId),
-        eq(gamePlatforms.platformId, platformId),
-      ),
-    )
-    .limit(1);
-  if (!link) throw new LogError("That platform isn't available for this game.");
+  if (!(await gameHasPlatform(tx, gameId, platformId))) {
+    throw new LogError("That platform isn't available for this game.");
+  }
 }
 
 // A game's average counts each player once, using their most recent rated

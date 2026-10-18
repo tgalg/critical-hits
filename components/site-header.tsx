@@ -17,6 +17,9 @@ export function SiteHeader() {
         <Link href="/diary" className="hover:underline">
           Diary
         </Link>
+        <Link href="/backlog" className="hover:underline">
+          Backlog
+        </Link>
         <Link href="/account" className="ml-auto hover:underline">
           Account
         </Link>

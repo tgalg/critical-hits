@@ -1,4 +1,4 @@
-import { asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { gamePlatforms, games, platforms } from "@/lib/db/schema";
 
@@ -58,4 +58,24 @@ export function starRating(avgRating: string | null) {
 
 export function releaseYear(releaseDate: string | null) {
   return releaseDate?.slice(0, 4) ?? null;
+}
+
+// Whether the game is released on the platform; logs and backlog entries may
+// only name one of the game's own platforms.
+export async function gameHasPlatform(
+  db: Pick<Database, "select">,
+  gameId: number,
+  platformId: number,
+) {
+  const [link] = await db
+    .select({ platformId: gamePlatforms.platformId })
+    .from(gamePlatforms)
+    .where(
+      and(
+        eq(gamePlatforms.gameId, gameId),
+        eq(gamePlatforms.platformId, platformId),
+      ),
+    )
+    .limit(1);
+  return !!link;
 }
