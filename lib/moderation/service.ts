@@ -11,32 +11,36 @@ type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 export class ModerationError extends Error {}
 
 // Files the player's report on a visible review that isn't their own.
-// Returns false when they have already reported it.
+// Returns false when they have already reported it. The review stays share-
+// locked until the report is written, so a hide either waits and then
+// resolves this report, or commits first and this report is refused.
 export async function reportReview(
   db: Database,
   userId: string,
   reviewId: number,
   reason: ReportReason,
 ) {
-  const [review] = await db
-    .select({ authorId: logs.userId })
-    .from(reviews)
-    .innerJoin(logs, eq(logs.id, reviews.logId))
-    .where(and(eq(reviews.id, reviewId), isNull(reviews.hiddenAt)))
-    .limit(1);
-  if (!review) throw new ModerationError("That review isn't available.");
-  if (review.authorId === userId) {
-    throw new ModerationError("You can't report your own review.");
-  }
-  if (!(await canPost(db, userId, "report"))) {
-    throw new ModerationError(limitMessages.report);
-  }
-  const inserted = await db
-    .insert(reports)
-    .values({ reviewId, reporterId: userId, reason })
-    .onConflictDoNothing()
-    .returning({ id: reports.id });
-  return inserted.length > 0;
+  return db.transaction(async (tx) => {
+    const { rows } = await tx.execute<{ author_id: string }>(sql`
+      SELECT ${logs.userId} AS author_id FROM ${reviews}
+      JOIN ${logs} ON ${logs.id} = ${reviews.logId}
+      WHERE ${reviews.id} = ${reviewId} AND ${reviews.hiddenAt} IS NULL
+      FOR SHARE OF reviews`);
+    const review = rows[0];
+    if (!review) throw new ModerationError("That review isn't available.");
+    if (review.author_id === userId) {
+      throw new ModerationError("You can't report your own review.");
+    }
+    if (!(await canPost(tx, userId, "report"))) {
+      throw new ModerationError(limitMessages.report);
+    }
+    const inserted = await tx
+      .insert(reports)
+      .values({ reviewId, reporterId: userId, reason })
+      .onConflictDoNothing()
+      .returning({ id: reports.id });
+    return inserted.length > 0;
+  });
 }
 
 const reviewSummary = {
@@ -75,9 +79,10 @@ export async function getOpenReports(db: Database) {
   }));
 }
 
-// The most recently hidden reviews, so a mistaken hide can be undone.
-export async function getHiddenReviews(db: Database) {
-  return db
+// One page of hidden reviews, newest hide first, so a mistaken hide can be
+// undone; plus whether older ones remain.
+export async function getHiddenReviews(db: Database, page = 1) {
+  const rows = await db
     .select({ ...reviewSummary, hiddenAt: reviews.hiddenAt })
     .from(reviews)
     .innerJoin(logs, eq(logs.id, reviews.logId))
@@ -85,7 +90,12 @@ export async function getHiddenReviews(db: Database) {
     .innerJoin(games, eq(games.id, logs.gameId))
     .where(isNotNull(reviews.hiddenAt))
     .orderBy(desc(reviews.hiddenAt), desc(reviews.id))
-    .limit(moderationQueueLimit);
+    .limit(moderationQueueLimit + 1)
+    .offset((page - 1) * moderationQueueLimit);
+  return {
+    reviews: rows.slice(0, moderationQueueLimit),
+    hasMore: rows.length > moderationQueueLimit,
+  };
 }
 
 const resolveReports = (db: Database | Transaction, reviewId: number) =>
