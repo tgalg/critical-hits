@@ -1,13 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
-import { syncCatalog } from "@/lib/catalog/sync";
+import { runNightlySync } from "@/lib/catalog/sync";
 import { getDatabase } from "@/lib/db";
 import { igdbSourceFromEnv } from "@/lib/igdb/source";
 
 export const maxDuration = 300;
 // Leave a minute of headroom for the last page before Vercel stops the run.
 const budgetMs = 240_000;
-
-const day = 24 * 60 * 60 * 1000;
 
 // Vercel Cron sends `Authorization: Bearer $CRON_SECRET`.
 function isAuthorized(request: Request) {
@@ -19,19 +17,16 @@ function isAuthorized(request: Request) {
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-// Nightly incremental sync: games IGDB changed in the last two days, so one
-// missed run is covered by the next.
+// Nightly sync: recent IGDB changes, then more of the initial backfill. Running
+// it by hand from the Vercel dashboard fills a new catalog faster.
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return new Response("Unauthorized", { status: 401 });
   }
-  // No page cap: the run continues until IGDB has nothing newer or the time
-  // budget runs out, so a busy window is not truncated to its lowest ids.
-  const result = await syncCatalog(getDatabase(), igdbSourceFromEnv(), {
-    updatedSince: new Date(Date.now() - 2 * day),
+  const result = await runNightlySync(getDatabase(), igdbSourceFromEnv(), {
     deadline: Date.now() + budgetMs,
   });
-  if (!result.done) {
+  if (!result.updated.done) {
     console.warn("IGDB sync hit its time budget", result);
   }
   return Response.json(result);

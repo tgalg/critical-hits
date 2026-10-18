@@ -71,6 +71,7 @@ describe.skipIf(!hasTestDatabase)("database schema", () => {
       "platforms",
       "reviews",
       "sessions",
+      "sync_cursors",
       "users",
       "verifications",
     ]);
