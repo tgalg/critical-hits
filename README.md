@@ -37,7 +37,7 @@ is no pnpm shim on PATH.
 | `pnpm test`                         | Run the Vitest unit suite once                                                                                                                |
 | `pnpm vitest run lib/utils.test.ts` | Run the sample unit test directly                                                                                                             |
 | `pnpm test:watch`                   | Watch unit tests                                                                                                                              |
-| `pnpm e2e`                          | Run the Chromium home-page smoke test; starts its own server on port 3100                                                                     |
+| `pnpm e2e`                          | Run the Chromium browser tests (auth and catalog need a migrated `DATABASE_URL`); builds and starts its own server on port 3100               |
 | `pnpm typecheck`                    | Generate Next.js types and run strict TypeScript checks                                                                                       |
 | `pnpm lint`                         | Check ESLint rules and Prettier formatting                                                                                                    |
 | `pnpm format`                       | Format application and root configuration files                                                                                               |
@@ -54,7 +54,7 @@ corepack pnpm e2e
 ```
 
 GitHub Actions runs lint, typecheck, unit tests, and build with a frozen lockfile.
-The browser smoke test is run separately and is not part of `pnpm check`.
+The browser tests are run separately and is not part of `pnpm check`.
 
 ## Structure and conventions
 
@@ -64,6 +64,8 @@ The browser smoke test is run separately and is not part of `pnpm check`.
 - `lib/utils.ts`: shared `cn` class utility; `lib/utils.test.ts` is its sample test.
 - `lib/db/`: lazy, server-only Drizzle connection and the MVP schema (`schema.ts`),
   with database tests in `schema.db.test.ts`.
+- `app/games/`: game search (`/games?q=`, pg_trgm fuzzy match plus substring)
+  and game pages (`/games/<slug>`); queries live in `lib/catalog/queries.ts`.
 - `lib/catalog/` and `lib/igdb/`: the game catalog. `CatalogSource` is the
   interface a game-data source implements; `lib/igdb/` implements it for IGDB
   (Twitch client-credentials token, 4 requests per second), and
@@ -77,7 +79,7 @@ The browser smoke test is run separately and is not part of `pnpm check`.
   `/sign-in` and `/account`. Set `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` in
   `.env`; Discord sign-in turns on only when `DISCORD_CLIENT_ID` and
   `DISCORD_CLIENT_SECRET` are both set.
-- `e2e/`: Playwright smoke and auth tests (the auth test needs a migrated
+- `e2e/`: Playwright smoke, auth and catalog tests (auth and catalog need a migrated
   `DATABASE_URL`), isolated from Vitest's `*.test.ts` discovery.
 - `drizzle.config.ts`: PostgreSQL migration configuration; requires `DATABASE_URL`.
 - `drizzle/`: generated migrations, starting with `0000_init.sql` (which also
