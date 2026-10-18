@@ -1,8 +1,12 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { CatalogGame, CatalogSource } from "@/lib/catalog/source";
-import { runNightlySync, syncCatalog } from "@/lib/catalog/sync";
-import { gamePlatforms, games, platforms } from "@/lib/db/schema";
+import {
+  runNightlySync,
+  saveBackfillProgress,
+  syncCatalog,
+} from "@/lib/catalog/sync";
+import { gamePlatforms, games, platforms, syncCursors } from "@/lib/db/schema";
 import { mapIgdbGame, type IgdbGame } from "@/lib/igdb/source";
 import fixture from "@/lib/igdb/__fixtures__/games.json";
 import {
@@ -126,5 +130,14 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
     // Once done, later nights skip the backfill.
     const third = await runNightlySync(db, source, { deadline });
     expect(third.backfill).toMatchObject({ done: true });
+  });
+
+  it("never moves the saved backfill cursor backwards", async () => {
+    const name = "igdb-backfill";
+    await saveBackfillProgress(db, { name, cursor: 113112, done: true });
+    // A slower overlapping run finishes later with older progress.
+    await saveBackfillProgress(db, { name, cursor: 1942, done: false });
+    const [saved] = await db.select().from(syncCursors);
+    expect(saved).toMatchObject({ cursor: 113112, done: true });
   });
 });

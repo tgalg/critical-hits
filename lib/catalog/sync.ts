@@ -116,6 +116,24 @@ export async function syncCatalog(
 }
 
 const backfillCursor = "igdb-backfill";
+
+// Overlapping runs (a manual run during the nightly one) may finish out of
+// order, so saved progress only ever moves forward.
+export async function saveBackfillProgress(
+  db: Database,
+  progress: { name: string; cursor: number; done: boolean },
+) {
+  await db
+    .insert(syncCursors)
+    .values(progress)
+    .onConflictDoUpdate({
+      target: syncCursors.name,
+      set: {
+        cursor: sql`greatest(${syncCursors.cursor}, ${excluded(syncCursors.cursor)})`,
+        done: sql`${syncCursors.done} or ${excluded(syncCursors.done)}`,
+      },
+    });
+}
 const day = 24 * 60 * 60 * 1000;
 
 // The nightly job: first games IGDB changed in the last two days, so one
@@ -160,12 +178,6 @@ export async function runNightlySync(
     cursor: result.cursor,
     done: result.done,
   };
-  await db
-    .insert(syncCursors)
-    .values(backfill)
-    .onConflictDoUpdate({
-      target: syncCursors.name,
-      set: { cursor: backfill.cursor, done: backfill.done },
-    });
+  await saveBackfillProgress(db, backfill);
   return { updated, backfill };
 }
