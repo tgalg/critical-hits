@@ -20,16 +20,10 @@ export const hourlyLimits: Record<
   report: { newAccount: 10, account: 30 },
 };
 
-// Reviews and lists are counted from posting_events, which deleting a post
-// leaves alone; reports are never deleted by their reporter.
-const recent = {
-  review: (userId: string) =>
-    sql`SELECT count(*) FROM posting_events WHERE user_id = ${userId} AND kind = 'review' AND created_at > now() - interval '1 hour'`,
-  list: (userId: string) =>
-    sql`SELECT count(*) FROM posting_events WHERE user_id = ${userId} AND kind = 'list' AND created_at > now() - interval '1 hour'`,
-  report: (userId: string) =>
-    sql`SELECT count(*) FROM reports WHERE reporter_id = ${userId} AND created_at > now() - interval '1 hour'`,
-};
+// Counted from posting_events, which deleting a post (or a reported review)
+// leaves alone, so deleting things never hands slots back.
+const recent = (userId: string, kind: PostKind) =>
+  sql`SELECT count(*) FROM posting_events WHERE user_id = ${userId} AND kind = ${kind} AND created_at > now() - interval '1 hour'`;
 
 // Whether the player may post one more of this kind now. Must run inside the
 // transaction that records the post: it takes a per-player lock held until
@@ -41,7 +35,7 @@ export async function canPost(tx: Transaction, userId: string, kind: PostKind) {
   );
   const { rows } = await tx.execute<{ is_new: boolean; posted: number }>(sql`
     SELECT created_at > now() - interval '1 day' AS is_new,
-           (${recent[kind](userId)})::int AS posted
+           (${recent(userId, kind)})::int AS posted
     FROM users WHERE id = ${userId}`);
   const row = rows[0];
   if (!row) return false;
@@ -49,12 +43,12 @@ export async function canPost(tx: Transaction, userId: string, kind: PostKind) {
   return row.posted < (row.is_new ? limit.newAccount : limit.account);
 }
 
-// Records a new review or list against the player's limit, dropping their
+// Records a new review, list or report against the player's limit, dropping their
 // records too old to count.
 export async function recordPost(
   db: Database | Transaction,
   userId: string,
-  kind: "review" | "list",
+  kind: PostKind,
 ) {
   await db
     .delete(postingEvents)

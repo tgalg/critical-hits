@@ -1,4 +1,4 @@
-CREATE TYPE "public"."post_kind" AS ENUM('review', 'list');--> statement-breakpoint
+CREATE TYPE "public"."post_kind" AS ENUM('review', 'list', 'report');--> statement-breakpoint
 CREATE TABLE "posting_events" (
 	"id" integer PRIMARY KEY GENERATED ALWAYS AS IDENTITY (sequence name "posting_events_id_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 2147483647 START WITH 1 CACHE 1),
 	"user_id" text NOT NULL,

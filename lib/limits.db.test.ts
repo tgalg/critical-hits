@@ -188,6 +188,27 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
     expect(await reportReview(db, "new", reviewIds[0], "abuse")).toBe(false);
   });
 
+  it("keeps counting reports after the reported review is deleted", async () => {
+    const logIds: number[] = [];
+    const reviewIds: number[] = [];
+    for (let i = 0; i <= hourlyLimits.report.newAccount; i++) {
+      const logId = await createLog(db, "old", hades, reviewed(`R${i}`));
+      const [row] = await db
+        .select({ id: reviews.id })
+        .from(reviews)
+        .where(eq(reviews.logId, logId));
+      logIds.push(logId);
+      reviewIds.push(row.id);
+    }
+    for (const id of reviewIds.slice(0, -1)) {
+      await reportReview(db, "new", id, "spam");
+    }
+    await deleteLog(db, "old", logIds[0]);
+    await expect(
+      reportReview(db, "new", reviewIds.at(-1)!, "spam"),
+    ).rejects.toThrow(ModerationError);
+  });
+
   it("treats a doubled report on the last free slot as a repeat", async () => {
     const reviewIds: number[] = [];
     for (let i = 0; i < hourlyLimits.report.newAccount; i++) {

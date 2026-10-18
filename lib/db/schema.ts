@@ -298,10 +298,10 @@ export const likes = pgTable(
   ],
 );
 
-export const postKind = pgEnum("post_kind", ["review", "list"]);
+export const postKind = pgEnum("post_kind", ["review", "list", "report"]);
 
-// One row per review or list a player creates, kept when the post is deleted,
-// so posting limits (lib/limits.ts) can't be dodged by deleting and reposting.
+// One row per review, list or report a player creates, kept when the post (or
+// the reported review) is deleted, so posting limits (lib/limits.ts) can't be dodged by deleting and reposting.
 export const postingEvents = pgTable(
   "posting_events",
   {
