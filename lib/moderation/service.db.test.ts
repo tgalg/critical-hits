@@ -1,7 +1,13 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { upsertCatalogGames } from "@/lib/catalog/sync";
-import { games, reports, reviews, users } from "@/lib/db/schema";
+import {
+  games,
+  logs as logTable,
+  reports,
+  reviews,
+  users,
+} from "@/lib/db/schema";
 import type { LogInput } from "@/lib/logs/input";
 import { createLog, deleteLog, getGameReviews } from "@/lib/logs/service";
 import {
@@ -10,6 +16,7 @@ import {
   getOpenReports,
   hideReview,
   ModerationError,
+  moderationQueueLimit,
   reportReview,
   unhideReview,
 } from "@/lib/moderation/service";
@@ -117,13 +124,58 @@ describe.skipIf(!hasTestDatabase)("moderation", () => {
 
     expect(await getGameReviews(db, hades)).toHaveLength(0);
     expect(await getOpenReports(db)).toHaveLength(0);
-    expect((await getHiddenReviews(db)).map((r) => r.id)).toEqual([reviewId]);
+    expect((await getHiddenReviews(db)).reviews.map((r) => r.id)).toEqual([
+      reviewId,
+    ]);
 
     await unhideReview(db, reviewId);
     expect((await getGameReviews(db, hades)).map((r) => r.id)).toEqual([
       reviewId,
     ]);
-    expect(await getHiddenReviews(db)).toHaveLength(0);
+    expect((await getHiddenReviews(db)).reviews).toHaveLength(0);
+  });
+
+  it("never leaves an open report on a review hidden at the same time", async () => {
+    for (let round = 0; round < 20; round++) {
+      const { reviewId } = await anasReview();
+      await Promise.allSettled([
+        reportReview(db, "ben", reviewId, "spam"),
+        hideReview(db, reviewId),
+        reportReview(db, "cy", reviewId, "abuse"),
+      ]);
+    }
+    expect(await getOpenReports(db)).toHaveLength(0);
+  });
+
+  it("pages through hidden reviews", async () => {
+    const logs = [];
+    for (let i = 0; i <= moderationQueueLimit; i++) {
+      logs.push({
+        userId: "ana",
+        gameId: hades,
+        status: "finished" as const,
+      });
+    }
+    const logIds = await db
+      .insert(logTable)
+      .values(logs)
+      .returning({ id: logTable.id });
+    await db.insert(reviews).values(
+      logIds.map(({ id }, i) => ({
+        logId: id,
+        body: `Hidden ${i}`,
+        hiddenAt: sql`now() - make_interval(secs => ${i})`,
+      })),
+    );
+    const first = await getHiddenReviews(db);
+    expect(first.reviews).toHaveLength(moderationQueueLimit);
+    expect(first.reviews[0].body).toBe("Hidden 0");
+    expect(first.hasMore).toBe(true);
+    const second = await getHiddenReviews(db, 2);
+    expect(second.reviews.map((r) => r.body)).toEqual([
+      `Hidden ${moderationQueueLimit}`,
+    ]);
+    expect(second.hasMore).toBe(false);
   });
 
   it("dismisses reports and leaves the review up", async () => {
