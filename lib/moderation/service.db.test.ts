@@ -55,6 +55,8 @@ describe.skipIf(!hasTestDatabase)("moderation", () => {
         id,
         email: `${id}@example.com`,
         username: id,
+        // Older accounts, so the race test stays under the posting limits.
+        createdAt: sql`now() - interval '2 days'`,
       })),
     );
     await upsertCatalogGames(db, [
