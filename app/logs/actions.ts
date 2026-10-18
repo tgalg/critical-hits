@@ -19,7 +19,10 @@ export type LogFormState = {
 };
 
 async function requireUserId() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  // Headers first: getAuth() connects to the database, which must not happen
+  // while a page is being prerendered at build time.
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
   if (!session) redirect("/sign-in");
   return session.user.id;
 }
