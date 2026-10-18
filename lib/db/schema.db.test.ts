@@ -1,7 +1,4 @@
 import { sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { migrate } from "drizzle-orm/node-postgres/migrator";
-import { Pool } from "pg";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   backlogItems,
@@ -11,25 +8,17 @@ import {
   reviews,
   users,
 } from "@/lib/db/schema";
+import {
+  hasTestDatabase,
+  openTestDatabase,
+  resetTestDatabase,
+} from "@/lib/test-database";
 
-// Runs only against a disposable database: the suite drops and recreates its schema.
-const url = process.env.TEST_DATABASE_URL;
-const disposable =
-  !!url && new URL(url).pathname.replace(/^\//, "").endsWith("_test");
-
-if (url && !disposable) {
-  throw new Error("TEST_DATABASE_URL must name a database ending in _test.");
-}
-
-describe.skipIf(!disposable)("database schema", () => {
-  const pool = new Pool({ connectionString: url });
-  const db = drizzle(pool);
+describe.skipIf(!hasTestDatabase)("database schema", () => {
+  const { pool, db } = openTestDatabase();
 
   beforeAll(async () => {
-    await pool.query(
-      "DROP SCHEMA IF EXISTS drizzle CASCADE; DROP SCHEMA public CASCADE; CREATE SCHEMA public;",
-    );
-    await migrate(db, { migrationsFolder: "./drizzle" });
+    await resetTestDatabase(pool, db);
   });
 
   beforeEach(async () => {
@@ -44,8 +33,8 @@ describe.skipIf(!disposable)("database schema", () => {
 
   async function seed() {
     await db.insert(users).values([
-      { id: "u1", username: "Ana" },
-      { id: "u2", username: "ben" },
+      { id: "u1", email: "ana@example.com", username: "ana" },
+      { id: "u2", email: "ben@example.com", username: "ben" },
     ]);
     const [game] = await db
       .insert(games)
@@ -69,6 +58,7 @@ describe.skipIf(!disposable)("database schema", () => {
       "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' ORDER BY table_name",
     );
     expect(rows.map((row) => row.table_name)).toEqual([
+      "accounts",
       "activities",
       "backlog_items",
       "follows",
@@ -80,7 +70,9 @@ describe.skipIf(!disposable)("database schema", () => {
       "logs",
       "platforms",
       "reviews",
+      "sessions",
       "users",
+      "verifications",
     ]);
   });
 
@@ -129,12 +121,15 @@ describe.skipIf(!disposable)("database schema", () => {
   it("treats usernames as case-insensitive and caps favourites at four", async () => {
     await seed();
     const duplicate = await violation(
-      db.insert(users).values({ id: "u3", username: "ANA" }),
+      db
+        .insert(users)
+        .values({ id: "u3", email: "ana2@example.com", username: "ANA" }),
     );
     expect(duplicate.constraint).toBe("users_username_lower_idx");
     const favourites = await violation(
       db.insert(users).values({
         id: "u4",
+        email: "cat@example.com",
         username: "cat",
         favouriteGameIds: [1, 2, 3, 4, 5],
       }),

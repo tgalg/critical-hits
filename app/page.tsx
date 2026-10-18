@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 
 export default function Home() {
@@ -16,6 +17,17 @@ export default function Home() {
             backlog, and discover what your friends are playing.
           </p>
           <p className="text-sm text-muted-foreground">Coming soon.</p>
+          <div className="flex gap-3 text-sm font-medium">
+            <Link
+              className="rounded-md bg-primary px-4 py-2 text-primary-foreground"
+              href="/sign-up"
+            >
+              Create an account
+            </Link>
+            <Link className="rounded-md border px-4 py-2" href="/sign-in">
+              Sign in
+            </Link>
+          </div>
         </CardContent>
       </Card>
     </main>
