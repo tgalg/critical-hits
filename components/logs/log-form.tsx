@@ -2,6 +2,7 @@
 
 import { useActionState, useId } from "react";
 import { saveLog, type LogFormState } from "@/app/logs/actions";
+import { reviewMaxLength } from "@/lib/logs/input";
 
 export type LogFormDefaults = {
   status: string;
@@ -12,6 +13,8 @@ export type LogFormDefaults = {
   rating: string;
   hearted: boolean;
   isReplay: boolean;
+  review: string;
+  containsSpoilers: boolean;
 };
 
 export const emptyLog: LogFormDefaults = {
@@ -23,6 +26,8 @@ export const emptyLog: LogFormDefaults = {
   rating: "",
   hearted: false,
   isReplay: false,
+  review: "",
+  containsSpoilers: false,
 };
 
 const inputClass =
@@ -85,7 +90,7 @@ export function LogForm({
   const typed = state.values;
   const value = (name: keyof LogFormDefaults) =>
     typed ? (typed[name] ?? "") : String(defaults[name]);
-  const checked = (name: "hearted" | "isReplay") =>
+  const checked = (name: "hearted" | "isReplay" | "containsSpoilers") =>
     typed ? typed[name] === "on" : defaults[name];
   const error = (name: string) =>
     state.errors?.[name as keyof typeof state.errors];
@@ -216,6 +221,27 @@ export function LogForm({
           <span>Replay</span>
         </label>
       </div>
+
+      <Field id={`${id}-review`} label="Review" error={error("review")}>
+        <textarea
+          id={`${id}-review`}
+          name="review"
+          rows={5}
+          maxLength={reviewMaxLength}
+          defaultValue={value("review")}
+          placeholder="Optional. What did you think?"
+          className={inputClass}
+          {...describe("review")}
+        />
+      </Field>
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="containsSpoilers"
+          defaultChecked={checked("containsSpoilers")}
+        />
+        <span>Contains spoilers</span>
+      </label>
 
       {state.message && (
         <p

@@ -67,6 +67,9 @@ export default async function DiaryPage(props: PageProps<"/diary">) {
                     {entry.game.title}
                   </Link>
                   <LogDetails log={entry} />
+                  {entry.reviewId !== null && (
+                    <p className="text-xs text-muted-foreground">Reviewed</p>
+                  )}
                 </div>
                 <Link
                   href={`/logs/${entry.id}/edit`}

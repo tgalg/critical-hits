@@ -15,6 +15,7 @@ export function logFormDefaults(log: {
   rating: number | null;
   hearted: boolean;
   isReplay: boolean;
+  review: { body: string; containsSpoilers: boolean } | null;
 }): LogFormDefaults {
   return {
     status: log.status,
@@ -25,5 +26,7 @@ export function logFormDefaults(log: {
     rating: log.rating === null ? "" : String(log.rating),
     hearted: log.hearted,
     isReplay: log.isReplay,
+    review: log.review?.body ?? "",
+    containsSpoilers: log.review?.containsSpoilers ?? false,
   };
 }

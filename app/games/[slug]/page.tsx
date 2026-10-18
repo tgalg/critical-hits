@@ -6,10 +6,11 @@ import { getGameBySlug, releaseYear, starRating } from "@/lib/catalog/queries";
 import { getDatabase } from "@/lib/db";
 import { BacklogButton } from "@/components/backlog/backlog-button";
 import { LogDetails } from "@/components/logs/log-details";
+import { GameReviews } from "@/components/logs/game-reviews";
 import { LogForm } from "@/components/logs/log-form";
 import { statusOptions } from "@/lib/logs/form-defaults";
 import { getBacklogEntry } from "@/lib/backlog/service";
-import { getUserLogsForGame } from "@/lib/logs/service";
+import { getGameReviews, getUserLogsForGame } from "@/lib/logs/service";
 import { getCurrentUser } from "@/lib/session";
 
 export async function generateMetadata(
@@ -32,6 +33,7 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
         getBacklogEntry(getDatabase(), user.id, game.id),
       ])
     : [[], null];
+  const reviews = await getGameReviews(getDatabase(), game.id);
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
@@ -100,7 +102,14 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
                     key={play.id}
                     className="flex items-center justify-between gap-4 px-4 py-3"
                   >
-                    <LogDetails log={play} />
+                    <div className="flex flex-wrap items-center gap-x-3">
+                      <LogDetails log={play} />
+                      {play.reviewId !== null && (
+                        <span className="text-sm text-muted-foreground">
+                          Reviewed
+                        </span>
+                      )}
+                    </div>
                     <Link
                       href={`/logs/${play.id}/edit`}
                       className="text-sm underline"
@@ -132,6 +141,13 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
             to log this game.
           </p>
         )}
+      </section>
+
+      <section aria-labelledby="reviews" className="mt-12 space-y-6">
+        <h2 id="reviews" className="text-xl font-semibold">
+          Reviews
+        </h2>
+        <GameReviews reviews={reviews} />
       </section>
     </main>
   );
