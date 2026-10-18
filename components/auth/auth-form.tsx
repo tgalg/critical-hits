@@ -69,6 +69,28 @@ export function AuthForm({
     router.refresh();
   }
 
+  // On success the browser leaves for Discord; anything else is shown here
+  // instead of failing silently.
+  async function onDiscord() {
+    setPending(true);
+    setError(null);
+    try {
+      const result = await authClient.signIn.social({
+        provider: "discord",
+        callbackURL: "/account",
+      });
+      if (result.error) {
+        setError(result.error.message || "Discord sign-in failed. Try again.");
+        setPending(false);
+      }
+    } catch {
+      setError(
+        "Couldn't reach the server. Check your connection and try again.",
+      );
+      setPending(false);
+    }
+  }
+
   const signingUp = mode === "sign-up";
 
   return (
@@ -129,13 +151,11 @@ export function AuthForm({
           {discordEnabled && (
             <button
               type="button"
-              className={`${buttonClass} bg-[#5865F2] text-white`}
-              onClick={() =>
-                authClient.signIn.social({
-                  provider: "discord",
-                  callbackURL: "/account",
-                })
-              }
+              className={buttonClass
+                .replace("bg-primary", "bg-[#5865F2]")
+                .replace("text-primary-foreground", "text-white")}
+              disabled={pending}
+              onClick={onDiscord}
             >
               Continue with Discord
             </button>
