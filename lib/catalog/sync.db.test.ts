@@ -106,6 +106,24 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
     expect(rows).toEqual([{ name: "RPG" }]);
   });
 
+  it("keeps genres when a source leaves them out, and clears them on []", async () => {
+    await syncCatalog(db, fixedSource(catalog));
+    const linked = await db.$count(gameGenres);
+    expect(linked).toBeGreaterThan(0);
+    const withoutGenres = catalog.map((game) => {
+      const copy = { ...game };
+      delete copy.genres;
+      return copy;
+    });
+    await syncCatalog(db, fixedSource(withoutGenres));
+    expect(await db.$count(gameGenres)).toBe(linked);
+    await syncCatalog(
+      db,
+      fixedSource(catalog.map((game) => ({ ...game, genres: [] }))),
+    );
+    expect(await db.$count(gameGenres)).toBe(0);
+  });
+
   it("stops after maxPages and resumes from the cursor", async () => {
     const partial = await syncCatalog(db, fixedSource(catalog), {
       pageSize: 1,
@@ -160,6 +178,27 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
     // Once done, later nights skip the backfill.
     const third = await runNightlySync(db, source, { deadline });
     expect(third.backfill).toMatchObject({ done: true });
+  });
+
+  it("ignores progress saved under the retired backfill cursor", async () => {
+    // A run on the previous deploy may still finish after the migration.
+    await saveBackfillProgress(db, {
+      name: "igdb-backfill",
+      cursor: 999_999,
+      done: true,
+    });
+    // Nothing changed recently, so only the backfill can bring games in.
+    const backfillOnly: CatalogSource = {
+      async fetchGames({ after, limit, updatedSince }) {
+        if (updatedSince) return [];
+        return catalog.filter((game) => game.igdbId > after).slice(0, limit);
+      },
+    };
+    const run = await runNightlySync(db, backfillOnly, {
+      deadline: Date.now() + 60_000,
+    });
+    expect(run.backfill).toMatchObject({ done: true });
+    expect(await db.$count(games)).toBe(catalog.length);
   });
 
   it("never moves the saved backfill cursor backwards", async () => {

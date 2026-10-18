@@ -97,10 +97,18 @@ export async function upsertCatalogGames(db: Database, batch: CatalogGame[]) {
         .returning({ id: genres.id, igdbId: genres.igdbId });
       for (const row of rows) genreIds.set(row.igdbId, row.id);
     }
-    await tx
-      .delete(gameGenres)
-      .where(inArray(gameGenres.gameId, [...gameIds.values()]));
-    const genreLinks = batch.flatMap((game) =>
+    // A source that doesn't know genres leaves them out; only games that came
+    // with a list (even an empty one) have their links replaced.
+    const withGenres = batch.filter((game) => game.genres !== undefined);
+    if (withGenres.length > 0) {
+      await tx.delete(gameGenres).where(
+        inArray(
+          gameGenres.gameId,
+          withGenres.map((game) => gameIds.get(game.igdbId)!),
+        ),
+      );
+    }
+    const genreLinks = withGenres.flatMap((game) =>
       (game.genres ?? []).map((genre) => ({
         gameId: gameIds.get(game.igdbId)!,
         genreId: genreIds.get(genre.igdbId)!,
@@ -153,7 +161,10 @@ export async function syncCatalog(
   return { games: total, cursor, done: false };
 }
 
-const backfillCursor = "igdb-backfill";
+// Versioned: a new name restarts the backfill from scratch, and a run still
+// going on an older deploy can only advance its own, retired cursor. The
+// "-genres" pass revisits every game to fill in genres.
+const backfillCursor = "igdb-backfill-genres";
 
 // Overlapping runs (a manual run during the nightly one) may finish out of
 // order, so saved progress only ever moves forward.

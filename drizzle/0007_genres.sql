@@ -14,5 +14,7 @@ CREATE TABLE "genres" (
 ALTER TABLE "game_genres" ADD CONSTRAINT "game_genres_game_id_games_id_fk" FOREIGN KEY ("game_id") REFERENCES "public"."games"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "game_genres" ADD CONSTRAINT "game_genres_genre_id_genres_id_fk" FOREIGN KEY ("genre_id") REFERENCES "public"."genres"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "game_genres_genre_idx" ON "game_genres" USING btree ("genre_id");--> statement-breakpoint
--- Games synced before genres existed have none; restart the nightly backfill so it fills them in.
-UPDATE "sync_cursors" SET "cursor" = 0, "done" = false WHERE "name" = 'igdb-backfill';
+-- Games synced before genres existed have none. The nightly backfill now uses a
+-- new cursor ("igdb-backfill-genres", see lib/catalog/sync.ts), so it starts over
+-- and fills them in; the old cursor is retired.
+DELETE FROM "sync_cursors" WHERE "name" = 'igdb-backfill';
