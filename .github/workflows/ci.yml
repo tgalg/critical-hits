@@ -11,8 +11,23 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: critical_hits
+          POSTGRES_PASSWORD: critical_hits
+          POSTGRES_DB: critical_hits_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U critical_hits -d critical_hits_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       NEXT_TELEMETRY_DISABLED: "1"
+      TEST_DATABASE_URL: postgresql://critical_hits:critical_hits@localhost:5432/critical_hits_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,7 +39,7 @@ jobs:
         run: corepack pnpm lint
       - name: Typecheck
         run: corepack pnpm typecheck
-      - name: Unit tests
+      - name: Unit and database tests
         run: corepack pnpm test
       - name: Production build
         run: corepack pnpm build

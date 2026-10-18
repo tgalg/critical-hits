@@ -10,7 +10,7 @@ Edit this file with facts verified from this repository. Both models read it.
 - Product and intended users: Critical Hits, a Letterboxd-style social diary for video games. Players log games they play, rate and review them, build lists, keep a backlog, and follow friends. The MVP is a responsive web app.
 - Main language and framework: TypeScript (strict) with Next.js 16 App Router and React 19. Styling with Tailwind CSS 4 and manually initialized shadcn/ui (New York style). Package manager pnpm 12.14.0, pinned in `package.json`; Node 22.13+ within the 22 LTS line.
 - Entry points and important directories: `app/layout.tsx`, `app/page.tsx`, and `app/globals.css`; `components/ui/` for UI primitives; `lib/utils.ts` for class utilities; `lib/db/` for the lazy server-only database connection and empty schema; `e2e/` for browser tests; `.github/workflows/ci.yml` for CI.
-- Data storage and external services: PostgreSQL 17 (Docker locally via `docker compose`), accessed through Drizzle ORM's node-postgres driver with drizzle-kit migrations. No tables or migrations yet. Better Auth (email plus one social provider), IGDB catalog integration (milestone 2), and Vercel hosting are planned and are not implemented in the scaffold.
+- Data storage and external services: PostgreSQL 17 (Docker locally via `docker compose`), accessed through Drizzle ORM's node-postgres driver with drizzle-kit migrations. The MVP schema (users, games, platforms, logs, reviews, lists, backlog, follows, likes, activities) lives in `lib/db/schema.ts`; migrations are in `drizzle/`. `users.id` is text so Better Auth can map its user model onto it. Better Auth (email plus one social provider), IGDB catalog integration (milestone 2), and Vercel hosting are planned and are not implemented in the scaffold.
 - Supported operating systems and shell: Windows with PowerShell for local development; CI on GitHub Actions.
 - Milestones: 1 Foundations (repo, CI, auth, schema, deploy), 2 Catalog (IGDB sync, search, game page), 3 Logging, 4 Social content, 5 Social graph, 6 Launch prep.
 - Agent roles: Codex builds and Claude reviews by default; swap roles (Claude builds, Codex reviews) for schema and auth tasks.
@@ -25,14 +25,14 @@ Use `N/A` with a reason when a check does not apply. Never invent a passing chec
 | --- | --- | --- |
 | Install dependencies | `pnpm install` (CI: `pnpm install --frozen-lockfile`) | Repository root; Node 22.13+ and pinned pnpm; `corepack pnpm` works without a pnpm PATH shim |
 | Start local development | `pnpm dev` | Repository root; `.env` from `.env.example` and `docker compose up -d db` for database work; placeholder page does not need the database |
-| Run targeted tests | `pnpm vitest run <path>` | Repository root |
+| Run targeted tests | `pnpm vitest run <path>` | Repository root; database tests in `lib/db/*.db.test.ts` run only when `TEST_DATABASE_URL` names a database ending in `_test` (see `.env.example`) and are skipped otherwise |
 | Run the relevant test suite | `pnpm test` then `pnpm e2e` | Repository root; run `pnpm exec playwright install chromium` once; e2e starts Next.js on `127.0.0.1:3100` |
 | Check types | `pnpm typecheck` | Repository root |
 | Lint or format check | `pnpm lint` | Repository root; ESLint plus Prettier; `pnpm format` applies formatting |
 | Build | `pnpm build` | Repository root; no database or environment variables needed for the placeholder |
 | Combined checks | `pnpm check` | Repository root; lint, typecheck, Vitest, production build; browser test is separate |
 | Generate migrations | `pnpm db:generate` | Repository root; `DATABASE_URL` in `.env`; generated SQL belongs in `drizzle/` |
-| Apply local migrations | `pnpm db:migrate` | Repository root; local database running and `DATABASE_URL` in `.env`; no migrations exist yet |
+| Apply local migrations | `pnpm db:migrate` | Repository root; local database running and `DATABASE_URL` in `.env`. `drizzle/0000_init.sql` enables `pg_trgm` for game title search |
 
 ## Conventions and boundaries
 
