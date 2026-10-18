@@ -2,7 +2,8 @@
 
 A social diary for video games, built with Next.js App Router, strict TypeScript,
 Tailwind CSS, and shadcn/ui. This first slice provides a placeholder home page and
-development tooling. Authentication, game data, and domain tables come later.
+development tooling, plus the MVP database schema. Authentication and game data
+come later.
 
 ## Local setup (PowerShell)
 
@@ -14,6 +15,7 @@ shim. If pnpm is already on PATH, use `pnpm` for the commands below.
 corepack pnpm install
 Copy-Item .env.example .env
 docker compose up -d db
+corepack pnpm db:migrate
 corepack pnpm dev
 ```
 
@@ -59,11 +61,13 @@ The browser smoke test is run separately and is not part of `pnpm check`.
 - `components/ui/`: shadcn/ui primitives; `components.json` records the manual
   initialization (New York style, CSS variables, `@/` aliases).
 - `lib/utils.ts`: shared `cn` class utility; `lib/utils.test.ts` is its sample test.
-- `lib/db/`: lazy, server-only Drizzle connection and an intentionally empty schema.
+- `lib/db/`: lazy, server-only Drizzle connection and the MVP schema (`schema.ts`),
+  with database tests in `schema.db.test.ts`.
 - `e2e/`: Playwright smoke test, isolated from Vitest's `*.test.ts` discovery.
 - `drizzle.config.ts`: PostgreSQL migration configuration; requires `DATABASE_URL`.
-- `drizzle/`: generated migrations when tables are added. No migration is needed
-  for the current empty schema. Review generated SQL before applying it.
+- `drizzle/`: generated migrations, starting with `0000_init.sql` (which also
+  enables `pg_trgm`). Run `pnpm db:migrate` after pulling schema changes, and
+  review generated SQL before applying it.
 - `harness/`: shared development workflow; see [its README](harness/README.md).
 
 Use strict TypeScript, ESLint's Next.js presets, and Prettier. Next.js generates
