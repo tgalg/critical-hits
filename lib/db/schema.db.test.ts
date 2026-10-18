@@ -71,6 +71,7 @@ describe.skipIf(!hasTestDatabase)("database schema", () => {
       "lists",
       "logs",
       "platforms",
+      "posting_events",
       "reports",
       "reviews",
       "sessions",
