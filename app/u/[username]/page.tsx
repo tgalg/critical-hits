@@ -9,6 +9,8 @@ import { getDatabase } from "@/lib/db";
 import { stars } from "@/lib/logs/input";
 import { getProfile, maxFavourites } from "@/lib/profile/service";
 import { getCurrentUser } from "@/lib/session";
+import { getFollowState } from "@/lib/social/service";
+import { FollowButton } from "@/components/social/follow-button";
 
 // Metadata and the page share one load per request. Next.js has already
 // decoded the username segment.
@@ -54,6 +56,11 @@ export default async function ProfilePage(props: PageProps<"/u/[username]">) {
   if (!profile) notFound();
   const viewer = await getCurrentUser();
   const own = viewer?.id === profile.user.id;
+  const followState = await getFollowState(
+    getDatabase(),
+    profile.user.id,
+    viewer?.id ?? null,
+  );
   const { user, stats } = profile;
   const statItems = [
     { label: "Games played", value: stats.gamesPlayed },
@@ -75,10 +82,22 @@ export default async function ProfilePage(props: PageProps<"/u/[username]">) {
         {user.bio && (
           <p className="leading-relaxed whitespace-pre-line">{user.bio}</p>
         )}
-        {own && (
+        <p className="text-sm text-muted-foreground">
+          {followState.followers}{" "}
+          {followState.followers === 1 ? "follower" : "followers"} ·{" "}
+          {followState.following} following
+        </p>
+        {own ? (
           <Link href="/account" className="text-sm underline">
             Edit profile
           </Link>
+        ) : (
+          viewer && (
+            <FollowButton
+              userId={profile.user.id}
+              following={followState.viewerFollows}
+            />
+          )
         )}
       </header>
 
