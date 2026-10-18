@@ -1,12 +1,11 @@
 "use server";
 
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { getAuth } from "@/lib/auth";
 import { getDatabase } from "@/lib/db";
 import { parseLogForm, type LogErrors } from "@/lib/logs/input";
 import { createLog, deleteLog, LogError, updateLog } from "@/lib/logs/service";
+import { requireUserId } from "@/lib/session";
 
 export type LogFormState = {
   status: "idle" | "saved" | "error";
@@ -17,15 +16,6 @@ export type LogFormState = {
   // What the player typed, so an invalid form keeps their input.
   values?: Record<string, string>;
 };
-
-async function requireUserId() {
-  // Headers first: getAuth() connects to the database, which must not happen
-  // while a page is being prerendered at build time.
-  const requestHeaders = await headers();
-  const session = await getAuth().api.getSession({ headers: requestHeaders });
-  if (!session) redirect("/sign-in");
-  return session.user.id;
-}
 
 const idFrom = (form: FormData, name: string) => {
   const id = Number(form.get(name));

@@ -1,5 +1,6 @@
 import "server-only";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 import { getAuth } from "@/lib/auth";
 
 // The signed-in user for this request, or null. Headers are read before
@@ -9,4 +10,11 @@ export async function getCurrentUser() {
   const requestHeaders = await headers();
   const session = await getAuth().api.getSession({ headers: requestHeaders });
   return session?.user ?? null;
+}
+
+// For server actions: the signed-in user's id, or a redirect to sign in.
+export async function requireUserId() {
+  const user = await getCurrentUser();
+  if (!user) redirect("/sign-in");
+  return user.id;
 }
