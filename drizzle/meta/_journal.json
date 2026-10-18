@@ -43,13 +43,6 @@
       "when": 1792362114853,
       "tag": "0005_backlog_privacy",
       "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1792363582786,
-      "tag": "0006_genres",
-      "breakpoints": true
     }
   ]
 }
