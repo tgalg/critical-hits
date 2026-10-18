@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import { GameCover } from "@/components/catalog/game-cover";
 import { ReviewBody } from "@/components/logs/game-reviews";
@@ -9,19 +10,16 @@ import { stars } from "@/lib/logs/input";
 import { getProfile, maxFavourites } from "@/lib/profile/service";
 import { getCurrentUser } from "@/lib/session";
 
-async function loadProfile(props: PageProps<"/u/[username]">) {
-  const { username } = await props.params;
-  return getProfile(
-    getDatabase(),
-    decodeURIComponent(username),
-    new Date().getUTCFullYear(),
-  );
-}
+// Metadata and the page share one load per request. Next.js has already
+// decoded the username segment.
+const loadProfile = cache((username: string) =>
+  getProfile(getDatabase(), username, new Date().getUTCFullYear()),
+);
 
 export async function generateMetadata(
   props: PageProps<"/u/[username]">,
 ): Promise<Metadata> {
-  const profile = await loadProfile(props);
+  const profile = await loadProfile((await props.params).username);
   return {
     title: profile
       ? `${profile.user.displayName || profile.user.username} · Critical Hits`
@@ -52,7 +50,7 @@ function Section({
 }
 
 export default async function ProfilePage(props: PageProps<"/u/[username]">) {
-  const profile = await loadProfile(props);
+  const profile = await loadProfile((await props.params).username);
   if (!profile) notFound();
   const viewer = await getCurrentUser();
   const own = viewer?.id === profile.user.id;

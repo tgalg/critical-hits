@@ -59,6 +59,8 @@ test("edits a profile, picks a favourite and shows it publicly", async ({
 });
 
 test("shows a not-found page for an unknown player", async ({ page }) => {
-  const response = await page.goto("/u/no-such-player-anywhere");
-  expect(response?.status()).toBe(404);
+  for (const path of ["/u/no-such-player-anywhere", "/u/%25"]) {
+    const response = await page.goto(path);
+    expect(response?.status()).toBe(404);
+  }
 });
