@@ -7,5 +7,5 @@ test("loads the Critical Hits home page", async ({ page }) => {
   await expect(
     page.getByRole("heading", { name: "Critical Hits", exact: true, level: 1 }),
   ).toBeVisible();
-  await expect(page.getByText("Coming soon.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Browse games" })).toBeVisible();
 });

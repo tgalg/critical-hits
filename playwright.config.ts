@@ -21,12 +21,14 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
+    // A production build: the dev server's on-demand compiles reload open
+    // pages when tests run in parallel, which breaks multi-step flows.
     command:
-      "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3100",
+      "node node_modules/next/dist/bin/next build && node node_modules/next/dist/bin/next start --hostname 127.0.0.1 --port 3100",
     url: baseURL,
     // Auth must trust the test server's origin whatever .env says.
     env: { BETTER_AUTH_URL: baseURL },
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 300_000,
   },
 });
