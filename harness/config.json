@@ -4,7 +4,7 @@
   "reviewer": "claude",
   "tools": {
     "codex": {
-      "command": "C:\\Users\\chabo\\AppData\\Local\\OpenAI\\Codex\\bin\\e78bad9887fa50cf\\codex.exe",
+      "command": "codex",
       "prefixArgs": [],
       "model": null
     },

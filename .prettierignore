@@ -1,0 +1,17 @@
+node_modules/
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+pnpm-lock.yaml
+coverage/
+playwright-report/
+test-results/
+.pnpm-store/
+.pnpm-state/
+.harness/
+.agents/
+.claude/
+AGENTS.md
+CLAUDE.md
+harness/

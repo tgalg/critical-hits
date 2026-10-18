@@ -34,3 +34,13 @@ Treat fields marked `UNKNOWN` as missing information; inspect the repository bef
 - Use `plan-task` for substantial task preparation, `systematic-debug` for unexplained failures, `verify-change` before completion claims, and `review-change` for independent review.
 - Keep acceptance criteria and important decisions in task files so the next model can continue without chat history.
 - If a review session disables automatic instruction loading, use the shared instructions and review skill supplied explicitly in its prompt.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

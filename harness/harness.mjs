@@ -396,7 +396,7 @@ async function build(repo, options) {
   const taskPath = displayPath(repo, task.directory);
   const prompt = `Read AGENTS.md, harness/PROJECT.md, and ${taskPath}/task.md. Read ${taskPath}/task.json and any ${taskPath}/handoff.md. ${latestReview ? `Read the latest review at ${displayPath(repo, latestReview.report)} and address substantive findings within task scope. ` : ''}Implement the task and run the relevant checks. Use harness/skills as appropriate. Write evidence, changes, unresolved issues, and remaining work to ${taskPath}/handoff.md. Do not commit, push, or deploy unless separately asked by the user.`;
   const args = agent === 'codex'
-    ? ['--sandbox', 'workspace-write', '--ask-for-approval', 'on-request', '--cd', repo]
+    ? ['--sandbox', 'workspace-write', '--cd', repo]
     : ['--permission-mode', 'default'];
   if (config.tools[agent].model) args.push('--model', config.tools[agent].model);
   args.push(prompt);

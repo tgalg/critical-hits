@@ -148,7 +148,7 @@ For subscription-based use, be aware that existing API-key/provider environment 
 
 ## Execution and review behavior
 
-- Builders run interactively. Codex gets the workspace-write sandbox and on-request approval policy. Claude starts in its default permission mode. You can approve necessary operations in the session.
+- Builders run interactively. Codex gets the workspace-write sandbox and inherits the approval policy from its Codex configuration. Claude starts in its default permission mode.
 - Review is noninteractive, with a 15-minute limit. Claude gets safe/restricted modes and only `Read`, `Glob`, and `Grep`; MCP tools are denied. Because safe mode disables automatic instruction/skill loading, the harness explicitly includes the shared instructions, project context, and review skill. Current Claude Code is required; unsupported flags fail without a weaker retry.
 - Codex review gets the read-only shell sandbox and never requests escalations. That limits shell filesystem writes; it is not full isolation from configured plugins, MCP integrations, or host-side hooks. Use your normal trusted CLI configuration for this starter.
 - Neither reviewer is asked to run project code. The builder runs tests, and the reviewer checks the evidence. Source inspection and a successful CLI exit do not prove the change is correct.

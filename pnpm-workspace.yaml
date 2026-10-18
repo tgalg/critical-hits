@@ -1,0 +1,7 @@
+# Run scripts against the installed lockfile without an implicit install.
+verifyDepsBeforeRun: false
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

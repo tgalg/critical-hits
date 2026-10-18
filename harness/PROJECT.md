@@ -3,14 +3,14 @@
 Edit this file with facts verified from this repository. Both models read it.
 `UNKNOWN` means not established; it is never a command to execute or a fact to infer.
 
-> Status: planned stack. The commands below become real once the `scaffold` task lands; until then the repository contains only the harness.
+> Status: the scaffold provides the application and tooling below. See the scaffold task handoff for verification evidence and remaining environment limitations.
 
 ## Purpose and architecture
 
 - Product and intended users: Critical Hits, a Letterboxd-style social diary for video games. Players log games they play, rate and review them, build lists, keep a backlog, and follow friends. The MVP is a responsive web app.
-- Main language and framework: TypeScript (strict) with Next.js App Router. Styling with Tailwind CSS and shadcn/ui. Package manager pnpm.
-- Entry points and important directories: UNKNOWN until scaffold lands (expected Next.js `app/` directory).
-- Data storage and external services: PostgreSQL (Docker locally via `docker compose`), accessed through Drizzle ORM with drizzle-kit migrations. Better Auth for authentication (email plus one social provider). IGDB for the game catalog (milestone 2). Hosting on Vercel.
+- Main language and framework: TypeScript (strict) with Next.js 16 App Router and React 19. Styling with Tailwind CSS 4 and manually initialized shadcn/ui (New York style). Package manager pnpm 12.14.0, pinned in `package.json`; Node 22.13+ within the 22 LTS line.
+- Entry points and important directories: `app/layout.tsx`, `app/page.tsx`, and `app/globals.css`; `components/ui/` for UI primitives; `lib/utils.ts` for class utilities; `lib/db/` for the lazy server-only database connection and empty schema; `e2e/` for browser tests; `.github/workflows/ci.yml` for CI.
+- Data storage and external services: PostgreSQL 17 (Docker locally via `docker compose`), accessed through Drizzle ORM's node-postgres driver with drizzle-kit migrations. No tables or migrations yet. Better Auth (email plus one social provider), IGDB catalog integration (milestone 2), and Vercel hosting are planned and are not implemented in the scaffold.
 - Supported operating systems and shell: Windows with PowerShell for local development; CI on GitHub Actions.
 - Milestones: 1 Foundations (repo, CI, auth, schema, deploy), 2 Catalog (IGDB sync, search, game page), 3 Logging, 4 Social content, 5 Social graph, 6 Launch prep.
 - Agent roles: Codex builds and Claude reviews by default; swap roles (Claude builds, Codex reviews) for schema and auth tasks.
@@ -23,21 +23,24 @@ Use `N/A` with a reason when a check does not apply. Never invent a passing chec
 
 | Purpose | Command | Working directory / prerequisites |
 | --- | --- | --- |
-| Install dependencies | `pnpm install` | Repository root; Node and pnpm installed |
-| Start local development | `pnpm dev` | Repository root; database running via `docker compose up -d db`; `.env` from `.env.example` |
+| Install dependencies | `pnpm install` (CI: `pnpm install --frozen-lockfile`) | Repository root; Node 22.13+ and pinned pnpm; `corepack pnpm` works without a pnpm PATH shim |
+| Start local development | `pnpm dev` | Repository root; `.env` from `.env.example` and `docker compose up -d db` for database work; placeholder page does not need the database |
 | Run targeted tests | `pnpm vitest run <path>` | Repository root |
-| Run the relevant test suite | `pnpm test` then `pnpm e2e` | Repository root; e2e uses Playwright |
+| Run the relevant test suite | `pnpm test` then `pnpm e2e` | Repository root; run `pnpm exec playwright install chromium` once; e2e starts Next.js on `127.0.0.1:3100` |
 | Check types | `pnpm typecheck` | Repository root |
-| Lint or format check | `pnpm lint` | Repository root |
-| Build | `pnpm build` | Repository root |
+| Lint or format check | `pnpm lint` | Repository root; ESLint plus Prettier; `pnpm format` applies formatting |
+| Build | `pnpm build` | Repository root; no database or environment variables needed for the placeholder |
+| Combined checks | `pnpm check` | Repository root; lint, typecheck, Vitest, production build; browser test is separate |
+| Generate migrations | `pnpm db:generate` | Repository root; `DATABASE_URL` in `.env`; generated SQL belongs in `drizzle/` |
+| Apply local migrations | `pnpm db:migrate` | Repository root; local database running and `DATABASE_URL` in `.env`; no migrations exist yet |
 
 ## Conventions and boundaries
 
-- Existing style and architecture references: UNKNOWN until scaffold lands (ESLint and Prettier planned).
-- Generated files and their source: UNKNOWN until scaffold lands (drizzle-kit migrations expected).
+- Existing style and architecture references: `eslint.config.mjs` uses Next.js core-web-vitals and TypeScript presets plus Prettier compatibility. `.prettierrc.json` uses double quotes, semicolons, trailing commas, and LF; `.gitattributes` preserves LF on Windows. `components.json` and `app/globals.css` initialize shadcn CSS variables and `@/` aliases. pnpm's `verifyDepsBeforeRun: false` keeps checks from implicitly installing; `allowBuilds` explicitly permits native dependency setup for esbuild, sharp, and unrs-resolver. Existing harness files are excluded from app formatting and lint rules.
+- Generated files and their source: `next-env.d.ts` and `.next/` are generated by Next.js and ignored; `*.tsbuildinfo`, Playwright reports, and coverage are ignored. `next dev` also appends a documentation-rules block to `AGENTS.md`, preserving existing instructions. `pnpm-lock.yaml` is generated by pnpm and tracked. Future Drizzle migrations are generated from `lib/db/schema.ts` via `drizzle.config.ts` and should be reviewed and tracked.
 - Sensitive or externally connected operations: database migrations against non-local databases, Vercel deploys, IGDB API calls, auth provider configuration.
 - Environment variables required for local work, by name only: `DATABASE_URL` (others to be listed in `.env.example`).
-- Known test failures or environment limitations, with evidence: As of 2026-10-17 on the dev machine, Node is v18.16.0 (Next.js 15+ needs >= 18.18, Next 16 needs >= 20.9), pnpm is not installed (corepack 0.17.0 present), and Docker is not installed.
+- Known environment limitations, with evidence: This scaffold session verified Node v22.23.2, Corepack 0.34.6, and pnpm 12.14.0 via `corepack pnpm --version`; no pnpm PATH shim or Docker command is installed. Default sandbox npm-registry connections fail with Windows socket permission error 10013; the existing approved Corepack command can download dependencies. Git requires a command-local `-c safe.directory=<repository path>` override for this sandbox user's ownership check; account configuration was not changed. Docker runtime validation remains unavailable until Docker is installed.
 
 ## Verification guidance
 
