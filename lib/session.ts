@@ -1,13 +1,16 @@
 import "server-only";
+import { getSessionCookie } from "better-auth/cookies";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getAuth } from "@/lib/auth";
 
 // The signed-in user for this request, or null. Headers are read before
 // getAuth() so the calling page is dynamic and never connects to the database
-// while being prerendered at build time.
+// while being prerendered at build time. Visitors without a session cookie
+// are answered without touching auth or the database at all.
 export async function getCurrentUser() {
   const requestHeaders = await headers();
+  if (!getSessionCookie(requestHeaders)) return null;
   const session = await getAuth().api.getSession({ headers: requestHeaders });
   return session?.user ?? null;
 }

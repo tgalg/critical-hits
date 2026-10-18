@@ -1,7 +1,64 @@
 import Link from "next/link";
+import { Feed } from "@/components/social/feed";
+import { PlayerSearch } from "@/components/social/player-search";
 import { Card, CardContent } from "@/components/ui/card";
+import { getDatabase } from "@/lib/db";
+import { getCurrentUser } from "@/lib/session";
+import { getFeed } from "@/lib/social/service";
 
-export default function Home() {
+// Signed-in players get the feed of people they follow; everyone else gets
+// the landing page.
+export default async function Home(props: PageProps<"/">) {
+  const user = await getCurrentUser();
+  if (user) {
+    const { page: pageParam } = await props.searchParams;
+    const requested = Number(pageParam);
+    const page =
+      Number.isSafeInteger(requested) && requested > 1 ? requested : 1;
+    const { entries, hasMore } = await getFeed(getDatabase(), user.id, page);
+    return (
+      <main className="mx-auto max-w-2xl space-y-6 px-6 py-12">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            From players you follow
+          </h1>
+          <Link href="/players" className="text-sm underline">
+            Find players
+          </Link>
+        </div>
+        {entries.length === 0 && page === 1 ? (
+          <div className="space-y-4">
+            <p className="text-muted-foreground">
+              Nothing here yet. Follow players to see what they play, review and
+              collect.
+            </p>
+            <PlayerSearch />
+          </div>
+        ) : (
+          <Feed entries={entries} />
+        )}
+        {(page > 1 || hasMore) && (
+          <nav aria-label="Feed pages" className="flex justify-between text-sm">
+            {page > 1 ? (
+              <Link
+                href={page === 2 ? "/" : `/?page=${page - 1}`}
+                className="underline"
+              >
+                Newer
+              </Link>
+            ) : (
+              <span />
+            )}
+            {hasMore && (
+              <Link href={`/?page=${page + 1}`} className="underline">
+                Older
+              </Link>
+            )}
+          </nav>
+        )}
+      </main>
+    );
+  }
   return (
     <main className="flex min-h-svh items-center justify-center px-6 py-16">
       <Card className="w-full max-w-2xl">
