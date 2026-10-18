@@ -1,7 +1,14 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { upsertCatalogGames } from "@/lib/catalog/sync";
-import { activities, follows, games, reviews, users } from "@/lib/db/schema";
+import {
+  activities,
+  follows,
+  games,
+  lists,
+  reviews,
+  users,
+} from "@/lib/db/schema";
 import { createList } from "@/lib/lists/service";
 import type { LogInput } from "@/lib/logs/input";
 import { createLog } from "@/lib/logs/service";
@@ -201,8 +208,18 @@ describe.skipIf(!hasTestDatabase)("social", () => {
         objectId: 100_000 + i,
       })),
     );
+    // Written directly, as createList would cap a new account's lists.
     for (let i = 0; i < feedPageSize + 2; i++) {
-      await createList(db, "ben", list(`List ${i}`));
+      const [{ id }] = await db
+        .insert(lists)
+        .values({ ...list(`List ${i}`), userId: "ben" })
+        .returning({ id: lists.id });
+      await db.insert(activities).values({
+        actorId: "ben",
+        verb: "created_list",
+        objectType: "list",
+        objectId: id,
+      });
     }
     const first = await getFeed(db, "ana");
     const second = await getFeed(db, "ana", 2);

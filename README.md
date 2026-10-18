@@ -110,6 +110,10 @@ The browser tests are run separately and is not part of `pnpm check`.
   and their author sees a note on the log. Moderators are listed by email in
   `ADMIN_EMAILS` (comma-separated) and must have a verified email, such as one
   from Discord sign-in; `/admin` is a 404 for everyone else.
+- `lib/limits.ts`: hourly posting limits on reviews, lists and reports, lower
+  for accounts less than a day old, to slow spam from fresh sign-ups.
+- Profiles show a player's backlog unless they untick "Show my backlog on my
+  profile" on `/account`; their own profile still shows it to them.
 - `lib/auth.ts`: Better Auth server config mapped onto the `users`, `sessions`,
   `accounts` and `verifications` tables; `lib/auth-client.ts` is the browser
   client. The API lives at `app/api/auth/[...all]`, with pages at `/sign-up`,

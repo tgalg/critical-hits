@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { games, logs, reports, reviews, users } from "@/lib/db/schema";
+import { canPost, limitMessages } from "@/lib/limits";
 import type { ReportReason } from "@/lib/moderation/reasons";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
@@ -26,6 +27,9 @@ export async function reportReview(
   if (!review) throw new ModerationError("That review isn't available.");
   if (review.authorId === userId) {
     throw new ModerationError("You can't report your own review.");
+  }
+  if (!(await canPost(db, userId, "report"))) {
+    throw new ModerationError(limitMessages.report);
   }
   const inserted = await db
     .insert(reports)

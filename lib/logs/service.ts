@@ -11,6 +11,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { gameHasPlatform } from "@/lib/catalog/queries";
+import { canPost, limitMessages } from "@/lib/limits";
 import type { LogInput, ReviewInput } from "@/lib/logs/input";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
@@ -99,6 +100,9 @@ async function saveReview(
   if (existing) {
     await tx.update(reviews).set(input).where(eq(reviews.id, existing.id));
     return;
+  }
+  if (!(await canPost(tx, userId, "review"))) {
+    throw new LogError(limitMessages.review);
   }
   const [review] = await tx
     .insert(reviews)
