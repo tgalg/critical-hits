@@ -83,4 +83,12 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
     expect(rest.done).toBe(true);
     expect(await db.$count(games)).toBe(2);
   });
+
+  it("stops starting pages once the deadline passes", async () => {
+    const result = await syncCatalog(db, fixedSource(catalog), {
+      pageSize: 1,
+      deadline: 0,
+    });
+    expect(result).toEqual({ games: 1, cursor: 1942, done: false });
+  });
 });
