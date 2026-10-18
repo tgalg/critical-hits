@@ -116,8 +116,8 @@ describe.skipIf(!hasTestDatabase)("authentication", () => {
     );
     const rows = await db.select({ username: users.username }).from(users);
     expect(rows.map((row) => row.username)).toEqual([
-      expect.stringMatching(/^eveonline_[0-9a-f]{6}$/),
-      expect.stringMatching(/^eveonline_[0-9a-f]{6}$/),
+      expect.stringMatching(/^eveonline_[0-9a-f]{8}$/),
+      expect.stringMatching(/^eveonline_[0-9a-f]{8}$/),
     ]);
     expect(first.id).not.toBe(second.id);
     expect(rows[0].username).not.toBe(rows[1].username);
@@ -125,10 +125,10 @@ describe.skipIf(!hasTestDatabase)("authentication", () => {
 
   it("falls back to the email or a default when the name has no usable characters", () => {
     expect(fallbackUsername({ name: "★★", email: "Zed@x.io" })).toMatch(
-      /^player_[0-9a-f]{6}$/,
+      /^player_[0-9a-f]{8}$/,
     );
     expect(fallbackUsername({ email: "Zed.K@x.io" })).toMatch(
-      /^zed\.k_[0-9a-f]{6}$/,
+      /^zed\.k_[0-9a-f]{8}$/,
     );
   });
 });

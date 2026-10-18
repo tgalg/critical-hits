@@ -2,6 +2,13 @@ import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = "http://127.0.0.1:3100";
 
+// Load .env so the auth tests see DATABASE_URL, as the dev server does.
+try {
+  process.loadEnvFile(".env");
+} catch {
+  // No .env: database-backed tests skip themselves.
+}
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -17,6 +24,8 @@ export default defineConfig({
     command:
       "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port 3100",
     url: baseURL,
+    // Auth must trust the test server's origin whatever .env says.
+    env: { BETTER_AUTH_URL: baseURL },
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

@@ -4,6 +4,7 @@ import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
 import { username } from "better-auth/plugins/username";
+import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { isDiscordEnabled } from "@/lib/auth-providers";
 import { getDatabase } from "@/lib/db";
@@ -23,18 +24,31 @@ function socialProviders() {
 }
 
 // Social sign-ups arrive without a username, but users.username is required.
-// Derive one from the profile and add a random suffix so it is unique; the
-// user can change it later.
+// Derive one from the profile plus a random suffix; createAuth retries on the
+// rare clash. The user can change it later.
 export function fallbackUsername(profile: { name?: string; email?: string }) {
   const base = (profile.name || profile.email?.split("@")[0] || "player")
     .toLowerCase()
     .replace(/[^a-z0-9_.]/g, "")
     .slice(0, 20);
-  return `${base || "player"}_${randomBytes(3).toString("hex")}`;
+  return `${base || "player"}_${randomBytes(4).toString("hex")}`;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 export function createAuth(db: NodePgDatabase<any>) {
+  async function unusedUsername(profile: { name?: string; email?: string }) {
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const candidate = fallbackUsername(profile);
+      const [taken] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.username, candidate))
+        .limit(1);
+      if (!taken) return candidate;
+    }
+    throw new Error("Could not generate an unused username.");
+  }
+
   return betterAuth({
     appName: "Critical Hits",
     baseURL: process.env.BETTER_AUTH_URL,
@@ -55,7 +69,7 @@ export function createAuth(db: NodePgDatabase<any>) {
         create: {
           before: async (user) => {
             if ((user as { username?: string }).username) return;
-            const username = fallbackUsername(user);
+            const username = await unusedUsername(user);
             return {
               data: { ...user, username, displayUsername: username },
             };
