@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   activities,
@@ -8,9 +8,10 @@ import {
   logs,
   platforms,
   reviews,
+  users,
 } from "@/lib/db/schema";
 import { gameHasPlatform } from "@/lib/catalog/queries";
-import type { LogInput } from "@/lib/logs/input";
+import type { LogInput, ReviewInput } from "@/lib/logs/input";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 type Database = NodePgDatabase<any>;
@@ -61,6 +62,55 @@ export async function recomputeGameRating(
   `);
 }
 
+// Likes and activities point at a review polymorphically, with no foreign key,
+// so they are removed by hand before the review itself.
+async function deleteReview(tx: Transaction, reviewId: number) {
+  await tx
+    .delete(likes)
+    .where(and(eq(likes.targetType, "review"), eq(likes.targetId, reviewId)));
+  await tx
+    .delete(activities)
+    .where(
+      and(
+        eq(activities.objectType, "review"),
+        eq(activities.objectId, reviewId),
+      ),
+    );
+  await tx.delete(reviews).where(eq(reviews.id, reviewId));
+}
+
+// Makes the log's review match the form: creates it (with a `reviewed`
+// activity), updates it, or deletes it when the text was cleared.
+async function saveReview(
+  tx: Transaction,
+  userId: string,
+  logId: number,
+  input: ReviewInput | null,
+) {
+  const [existing] = await tx
+    .select({ id: reviews.id })
+    .from(reviews)
+    .where(eq(reviews.logId, logId));
+  if (!input) {
+    if (existing) await deleteReview(tx, existing.id);
+    return;
+  }
+  if (existing) {
+    await tx.update(reviews).set(input).where(eq(reviews.id, existing.id));
+    return;
+  }
+  const [review] = await tx
+    .insert(reviews)
+    .values({ ...input, logId })
+    .returning({ id: reviews.id });
+  await tx.insert(activities).values({
+    actorId: userId,
+    verb: "reviewed",
+    objectType: "review",
+    objectId: review.id,
+  });
+}
+
 export async function createLog(
   db: Database,
   userId: string,
@@ -70,9 +120,10 @@ export async function createLog(
   return db.transaction(async (tx) => {
     await lockGame(tx, gameId);
     await checkPlatform(tx, gameId, input.platformId);
+    const { review, ...fields } = input;
     const [log] = await tx
       .insert(logs)
-      .values({ ...input, userId, gameId })
+      .values({ ...fields, userId, gameId })
       .returning({ id: logs.id });
     await tx.insert(activities).values({
       actorId: userId,
@@ -86,6 +137,7 @@ export async function createLog(
       .where(
         and(eq(backlogItems.userId, userId), eq(backlogItems.gameId, gameId)),
       );
+    await saveReview(tx, userId, log.id, review);
     await recomputeGameRating(tx, gameId);
     return log.id;
   });
@@ -113,10 +165,12 @@ export async function updateLog(
     const { gameId } = await ownedLog(tx, userId, logId);
     await lockGame(tx, gameId);
     await checkPlatform(tx, gameId, input.platformId);
+    const { review, ...fields } = input;
     await tx
       .update(logs)
-      .set(input)
+      .set(fields)
       .where(and(eq(logs.id, logId), eq(logs.userId, userId)));
+    await saveReview(tx, userId, logId, review);
     await recomputeGameRating(tx, gameId);
     return gameId;
   });
@@ -126,27 +180,11 @@ export async function deleteLog(db: Database, userId: string, logId: number) {
   return db.transaction(async (tx) => {
     const { gameId } = await ownedLog(tx, userId, logId);
     await lockGame(tx, gameId);
-    // The log's review goes with it through the foreign key, but likes and
-    // activities point at it polymorphically, so remove those by hand.
     const [review] = await tx
       .select({ id: reviews.id })
       .from(reviews)
       .where(eq(reviews.logId, logId));
-    if (review) {
-      await tx
-        .delete(likes)
-        .where(
-          and(eq(likes.targetType, "review"), eq(likes.targetId, review.id)),
-        );
-      await tx
-        .delete(activities)
-        .where(
-          and(
-            eq(activities.objectType, "review"),
-            eq(activities.objectId, review.id),
-          ),
-        );
-    }
+    if (review) await deleteReview(tx, review.id);
     await tx
       .delete(logs)
       .where(and(eq(logs.id, logId), eq(logs.userId, userId)));
@@ -174,6 +212,12 @@ const logColumns = {
   createdAt: logs.createdAt,
 };
 
+// The log's review, if it has one; reviews are one per log.
+const reviewColumns = {
+  body: reviews.body,
+  containsSpoilers: reviews.containsSpoilers,
+};
+
 export type LogRow = Awaited<ReturnType<typeof getUserLogsForGame>>[number];
 
 export async function getUserLogsForGame(
@@ -182,9 +226,10 @@ export async function getUserLogsForGame(
   gameId: number,
 ) {
   return db
-    .select(logColumns)
+    .select({ ...logColumns, reviewId: reviews.id })
     .from(logs)
     .leftJoin(platforms, eq(platforms.id, logs.platformId))
+    .leftJoin(reviews, eq(reviews.logId, logs.id))
     .where(and(eq(logs.userId, userId), eq(logs.gameId, gameId)))
     .orderBy(desc(logs.createdAt), desc(logs.id));
 }
@@ -201,11 +246,13 @@ export async function getDiary(db: Database, userId: string, page = 1) {
     .select({
       ...logColumns,
       diaryDate,
+      reviewId: reviews.id,
       game: { slug: games.slug, title: games.title, coverUrl: games.coverUrl },
     })
     .from(logs)
     .innerJoin(games, eq(games.id, logs.gameId))
     .leftJoin(platforms, eq(platforms.id, logs.platformId))
+    .leftJoin(reviews, eq(reviews.logId, logs.id))
     .where(eq(logs.userId, userId))
     .orderBy(desc(diaryDate), desc(logs.createdAt), desc(logs.id))
     .limit(diaryPageSize + 1)
@@ -222,11 +269,34 @@ export async function getOwnedLog(db: Database, userId: string, logId: number) {
       ...logColumns,
       gameId: logs.gameId,
       game: { slug: games.slug, title: games.title },
+      review: reviewColumns,
     })
     .from(logs)
     .innerJoin(games, eq(games.id, logs.gameId))
     .leftJoin(platforms, eq(platforms.id, logs.platformId))
+    .leftJoin(reviews, eq(reviews.logId, logs.id))
     .where(and(eq(logs.id, logId), eq(logs.userId, userId)))
     .limit(1);
   return log ?? null;
+}
+
+export const gameReviewsLimit = 20;
+
+// The newest visible reviews of a game from every player, with the rating
+// given on the reviewed play.
+export async function getGameReviews(db: Database, gameId: number) {
+  return db
+    .select({
+      id: reviews.id,
+      ...reviewColumns,
+      createdAt: reviews.createdAt,
+      rating: logs.rating,
+      author: sql<string>`coalesce(${users.displayUsername}, ${users.username})`,
+    })
+    .from(reviews)
+    .innerJoin(logs, eq(logs.id, reviews.logId))
+    .innerJoin(users, eq(users.id, logs.userId))
+    .where(and(eq(logs.gameId, gameId), isNull(reviews.hiddenAt)))
+    .orderBy(desc(reviews.createdAt), desc(reviews.id))
+    .limit(gameReviewsLimit);
 }

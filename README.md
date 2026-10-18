@@ -82,7 +82,9 @@ The browser tests are run separately and is not part of `pnpm check`.
   form, and `lib/logs/service.ts` does every write in one transaction that
   checks ownership, records a `logged` activity, takes the game off the
   backlog and recomputes the game's average (each player's latest rating
-  counts once) under a lock on the game row.
+  counts once) under a lock on the game row. A log can carry one plain-text
+  review (optional spoiler flag), saved in the same transaction with a
+  `reviewed` activity; the game page lists the newest visible reviews.
 - `lib/backlog/` and `app/backlog/`: the "Want to play" queue. Players add a
   game from its page (optionally naming a platform), then reorder, filter by
   platform and remove entries at `/backlog`. Writes lock the player's user row

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { logStatus } from "@/lib/db/schema";
-import { parseLogForm, stars, statusLabels } from "@/lib/logs/input";
+import {
+  parseLogForm,
+  reviewMaxLength,
+  stars,
+  statusLabels,
+} from "@/lib/logs/input";
 
 const form = (fields: Record<string, string>) => {
   const data = new FormData();
@@ -34,6 +39,7 @@ describe("parseLogForm", () => {
         rating: 9,
         hearted: true,
         isReplay: true,
+        review: null,
       },
     });
   });
@@ -54,6 +60,7 @@ describe("parseLogForm", () => {
         rating: null,
         hearted: false,
         isReplay: false,
+        review: null,
       },
     });
   });
@@ -106,6 +113,42 @@ describe("parseLogForm", () => {
 });
 
 describe("display helpers", () => {
+  it("trims a review and keeps its spoiler flag", () => {
+    const parsed = parseLogForm(
+      form({
+        status: "finished",
+        review: "  Great ending.\nCried twice.  ",
+        containsSpoilers: "on",
+      }),
+    );
+    expect(parsed.ok && parsed.value.review).toEqual({
+      body: "Great ending.\nCried twice.",
+      containsSpoilers: true,
+    });
+  });
+
+  it("drops a blank review, even with spoilers ticked", () => {
+    const parsed = parseLogForm(
+      form({ status: "finished", review: "   ", containsSpoilers: "on" }),
+    );
+    expect(parsed.ok && parsed.value.review).toBeNull();
+  });
+
+  it("rejects a review over the length limit", () => {
+    const at = parseLogForm(
+      form({ status: "finished", review: "a".repeat(reviewMaxLength) }),
+    );
+    expect(at.ok).toBe(true);
+    expect(
+      parseLogForm(
+        form({ status: "finished", review: "a".repeat(reviewMaxLength + 1) }),
+      ),
+    ).toEqual({
+      ok: false,
+      errors: { review: "Keep your review to 10,000 characters or fewer." },
+    });
+  });
+
   it("labels every status in the schema", () => {
     expect(Object.keys(statusLabels).sort()).toEqual(
       [...logStatus.enumValues].sort(),

@@ -9,6 +9,10 @@ export const statusLabels: Record<LogStatus, string> = {
   shelved: "Shelved",
 };
 
+export const reviewMaxLength = 10_000;
+
+export type ReviewInput = { body: string; containsSpoilers: boolean };
+
 export type LogInput = {
   status: LogStatus;
   platformId: number | null;
@@ -20,6 +24,8 @@ export type LogInput = {
   rating: number | null;
   hearted: boolean;
   isReplay: boolean;
+  // A blank review means the log has none, so saving one deletes it.
+  review: ReviewInput | null;
 };
 
 export type LogField = keyof LogInput;
@@ -91,6 +97,12 @@ export function parseLogForm(form: FormLike): ParsedLog {
     errors.rating = "Choose a rating from half a star to five stars.";
   }
 
+  // Browsers submit line breaks as CRLF; store them as plain newlines.
+  const review = text(form, "review").replace(/\r\n?/g, "\n");
+  if (review.length > reviewMaxLength) {
+    errors.review = `Keep your review to ${reviewMaxLength.toLocaleString("en")} characters or fewer.`;
+  }
+
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return {
     ok: true,
@@ -103,6 +115,12 @@ export function parseLogForm(form: FormLike): ParsedLog {
       rating,
       hearted: form.get("hearted") === "on",
       isReplay: form.get("isReplay") === "on",
+      review: review
+        ? {
+            body: review,
+            containsSpoilers: form.get("containsSpoilers") === "on",
+          }
+        : null,
     },
   };
 }

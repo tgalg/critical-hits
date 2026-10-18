@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { upsertCatalogGames } from "@/lib/catalog/sync";
 import {
@@ -17,6 +17,7 @@ import {
   deleteLog,
   diaryPageSize,
   getDiary,
+  getGameReviews,
   getOwnedLog,
   getUserLogsForGame,
   LogError,
@@ -37,6 +38,7 @@ const play = (overrides: Partial<LogInput> = {}): LogInput => ({
   rating: null,
   hearted: false,
   isReplay: false,
+  review: null,
   ...overrides,
 });
 
@@ -243,5 +245,91 @@ describe.skipIf(!hasTestDatabase)("logs", () => {
     expect(await db.$count(reviews)).toBe(0);
     expect(await db.$count(likes)).toBe(0);
     expect(await db.$count(activities)).toBe(0);
+  });
+
+  const reviewed = (body: string, containsSpoilers = false) =>
+    play({ rating: 8, review: { body, containsSpoilers } });
+
+  const reviewActivities = () =>
+    db
+      .select({ objectId: activities.objectId })
+      .from(activities)
+      .where(eq(activities.verb, "reviewed"));
+
+  it("writes a review with its log and records it once", async () => {
+    const id = await createLog(db, "ana", hades, reviewed("Loved it."));
+    const [review] = await db.select().from(reviews);
+    expect(review).toMatchObject({
+      logId: id,
+      body: "Loved it.",
+      containsSpoilers: false,
+    });
+    expect(await reviewActivities()).toEqual([{ objectId: review.id }]);
+    expect((await getOwnedLog(db, "ana", id))?.review).toEqual({
+      body: "Loved it.",
+      containsSpoilers: false,
+    });
+    expect(
+      (await getDiary(db, "ana")).entries.map((entry) => entry.reviewId),
+    ).toEqual([review.id]);
+
+    // Editing keeps the same review and doesn't add another activity.
+    await updateLog(db, "ana", id, reviewed("Even better twice.", true));
+    const [edited] = await db.select().from(reviews);
+    expect(edited).toMatchObject({
+      id: review.id,
+      body: "Even better twice.",
+      containsSpoilers: true,
+    });
+    expect(await reviewActivities()).toEqual([{ objectId: review.id }]);
+  });
+
+  it("adds a review to an existing log and deletes it when cleared", async () => {
+    const id = await createLog(db, "ana", hades, play());
+    expect(await db.$count(reviews)).toBe(0);
+    expect((await getOwnedLog(db, "ana", id))?.review).toBeNull();
+
+    await updateLog(db, "ana", id, reviewed("Came back to it."));
+    const [review] = await db.select().from(reviews);
+    expect(await reviewActivities()).toEqual([{ objectId: review.id }]);
+    await db
+      .insert(likes)
+      .values({ userId: "ben", targetType: "review", targetId: review.id });
+
+    await updateLog(db, "ana", id, play({ rating: 8 }));
+    expect(await db.$count(reviews)).toBe(0);
+    expect(await db.$count(likes)).toBe(0);
+    expect(await reviewActivities()).toEqual([]);
+    // The log itself stays, with its logged activity.
+    expect((await getOwnedLog(db, "ana", id))?.rating).toBe(8);
+    expect(await db.$count(activities)).toBe(1);
+  });
+
+  it("lists a game's visible reviews, newest first", async () => {
+    await createLog(db, "ana", hades, reviewed("First!"));
+    await createLog(db, "ben", hades, reviewed("Spoilers ahead.", true));
+    const hidden = await createLog(db, "ben", hades, reviewed("Spam."));
+    await createLog(db, "ana", celeste, reviewed("Other game."));
+    await db
+      .update(reviews)
+      .set({ hiddenAt: sql`now()` })
+      .where(eq(reviews.logId, hidden));
+
+    expect(
+      (await getGameReviews(db, hades)).map((review) => ({
+        author: review.author,
+        body: review.body,
+        containsSpoilers: review.containsSpoilers,
+        rating: review.rating,
+      })),
+    ).toEqual([
+      {
+        author: "ben",
+        body: "Spoilers ahead.",
+        containsSpoilers: true,
+        rating: 8,
+      },
+      { author: "ana", body: "First!", containsSpoilers: false, rating: 8 },
+    ]);
   });
 });

@@ -60,8 +60,20 @@ test("logs a game, sees it in the diary, edits and deletes it", async ({
   await page.getByLabel("Finished").fill("2026-03-15");
   await page.getByLabel("Hours played").fill("12.5");
   await page.getByLabel("Favourite ♥").check();
+  await page
+    .getByRole("textbox", { name: "Review" })
+    .fill("The boss rush ending.\nWorth it.");
+  await page.getByLabel("Contains spoilers").check();
   await page.getByRole("button", { name: "Save log" }).click();
   await expect(page.getByRole("status")).toHaveText("Logged.");
+  // The review shows under Reviews, hidden behind its spoiler warning.
+  const reviews = page.getByRole("region", { name: "Reviews" });
+  await expect(reviews.getByText(name)).toBeVisible();
+  await expect(reviews.getByText("Worth it.")).toBeHidden();
+  await reviews.getByText("This review contains spoilers").click();
+  await expect(
+    reviews.getByText(/The boss rush ending\.\s+Worth it\./),
+  ).toBeVisible();
   const plays = page.getByRole("region", { name: "Your plays" });
   await expect(plays.getByLabel("Rated 4.5 out of 5")).toBeVisible();
   await expect(plays.getByRole("list").getByText("E2E Console")).toBeVisible();
@@ -73,13 +85,19 @@ test("logs a game, sees it in the diary, edits and deletes it", async ({
     page.getByRole("link", { name: "E2E Log Legends", exact: true }),
   ).toBeVisible();
   await expect(page.getByText("12.5 h")).toBeVisible();
+  await expect(page.getByText("Reviewed")).toBeVisible();
 
   await page.getByRole("link", { name: "Edit E2E Log Legends log" }).click();
   await expect(page.getByLabel("Rating")).toHaveValue("9");
+  await expect(page.getByRole("textbox", { name: "Review" })).toHaveValue(
+    "The boss rush ending.\nWorth it.",
+  );
   await page.getByLabel("Rating").selectOption({ label: "2 stars" });
+  await page.getByRole("textbox", { name: "Review" }).fill("");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page).toHaveURL(/\/diary$/);
   await expect(page.getByLabel("Rated 2 out of 5")).toBeVisible();
+  await expect(page.getByText("Reviewed")).toBeHidden();
 
   await page.getByRole("link", { name: "Edit E2E Log Legends log" }).click();
   await page.getByRole("button", { name: "Delete this log" }).click();

@@ -148,6 +148,7 @@ describe.skipIf(!hasTestDatabase)("backlog", () => {
       rating: null,
       hearted: false,
       isReplay: false,
+      review: null,
     });
     expect(await order()).toEqual(["celeste"]);
   });
@@ -162,6 +163,7 @@ describe.skipIf(!hasTestDatabase)("backlog", () => {
       rating: null,
       hearted: false,
       isReplay: false,
+      review: null,
     };
     for (let round = 0; round < 10; round++) {
       await Promise.all([
