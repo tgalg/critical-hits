@@ -80,6 +80,8 @@ export type SyncOptions = {
   after?: number;
   pageSize?: number;
   maxPages?: number;
+  // Stop starting new pages after this time (ms since the epoch).
+  deadline?: number;
   onPage?: (progress: { games: number; cursor: number }) => void;
 };
 
@@ -91,12 +93,14 @@ export async function syncCatalog(
     after = 0,
     pageSize = 500,
     maxPages = Infinity,
+    deadline = Infinity,
     onPage,
   }: SyncOptions = {},
 ) {
   let cursor = after;
   let total = 0;
   for (let page = 0; page < maxPages; page++) {
+    if (page > 0 && Date.now() >= deadline) break;
     const batch = await source.fetchGames({
       after: cursor,
       limit: pageSize,
