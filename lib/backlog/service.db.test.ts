@@ -151,4 +151,26 @@ describe.skipIf(!hasTestDatabase)("backlog", () => {
     });
     expect(await order()).toEqual(["celeste"]);
   });
+
+  it("adds and logs the same game at once without deadlocking", async () => {
+    const play = {
+      status: "playing" as const,
+      platformId: null,
+      startedOn: null,
+      finishedOn: null,
+      hours: null,
+      rating: null,
+      hearted: false,
+      isReplay: false,
+    };
+    for (let round = 0; round < 10; round++) {
+      await Promise.all([
+        addToBacklog(db, "ana", game.get("tunic")!, null),
+        createLog(db, "ana", game.get("tunic")!, play),
+        addToBacklog(db, "ana", game.get("celeste")!, null),
+      ]);
+      await removeFromBacklog(db, "ana", game.get("tunic")!);
+      await removeFromBacklog(db, "ana", game.get("celeste")!);
+    }
+  });
 });

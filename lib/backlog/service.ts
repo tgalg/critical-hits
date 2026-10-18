@@ -10,9 +10,14 @@ type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 export class BacklogError extends Error {}
 
 // Every backlog change for a player runs under a lock on their user row, so
-// two tabs adding or moving at once can't hand out the same position.
+// two tabs adding or moving at once can't hand out the same position. NO KEY
+// UPDATE serializes backlog writers without blocking the key-share locks that
+// foreign keys take, so it can't deadlock with createLog, which locks the
+// game first and then inserts a row referencing the user.
 async function lockPlayer(tx: Transaction, userId: string) {
-  await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+  await tx.execute(
+    sql`SELECT id FROM users WHERE id = ${userId} FOR NO KEY UPDATE`,
+  );
 }
 
 // Adds a game to the end of the player's backlog. Adding a game that is
