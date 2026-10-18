@@ -8,7 +8,9 @@ import { getAuth } from "@/lib/auth";
 export const metadata: Metadata = { title: "Your account · Critical Hits" };
 
 export default async function AccountPage() {
-  const session = await getAuth().api.getSession({ headers: await headers() });
+  // Read headers first so the page renders per request, never at build time.
+  const requestHeaders = await headers();
+  const session = await getAuth().api.getSession({ headers: requestHeaders });
   if (!session) redirect("/sign-in");
   const { user } = session;
 
