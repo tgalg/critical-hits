@@ -1,4 +1,5 @@
 import "server-only";
+import { randomBytes } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { nextCookies } from "better-auth/next-js";
@@ -21,6 +22,17 @@ function socialProviders() {
     : {};
 }
 
+// Social sign-ups arrive without a username, but users.username is required.
+// Derive one from the profile and add a random suffix so it is unique; the
+// user can change it later.
+export function fallbackUsername(profile: { name?: string; email?: string }) {
+  const base = (profile.name || profile.email?.split("@")[0] || "player")
+    .toLowerCase()
+    .replace(/[^a-z0-9_.]/g, "")
+    .slice(0, 20);
+  return `${base || "player"}_${randomBytes(3).toString("hex")}`;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 export function createAuth(db: NodePgDatabase<any>) {
   return betterAuth({
@@ -38,6 +50,19 @@ export function createAuth(db: NodePgDatabase<any>) {
     session: { modelName: "sessions" },
     account: { modelName: "accounts" },
     verification: { modelName: "verifications" },
+    databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            if ((user as { username?: string }).username) return;
+            const username = fallbackUsername(user);
+            return {
+              data: { ...user, username, displayUsername: username },
+            };
+          },
+        },
+      },
+    },
     emailAndPassword: { enabled: true, minPasswordLength: 8 },
     socialProviders: socialProviders(),
     plugins: [

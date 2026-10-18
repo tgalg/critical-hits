@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createAuth } from "@/lib/auth";
+import { createAuth, fallbackUsername } from "@/lib/auth";
 import { accounts, sessions, users } from "@/lib/db/schema";
 import {
   hasTestDatabase,
@@ -89,5 +89,46 @@ describe.skipIf(!hasTestDatabase)("authentication", () => {
       signUp({ email: "dan@example.com", username: "dan", password: "short" }),
     ).rejects.toThrow();
     expect(await db.$count(users)).toBe(1);
+  });
+
+  it("gives social sign-ups without a username a unique one", async () => {
+    const context = await auth.$context;
+    // The same call Better Auth makes for a first-time OAuth sign-in.
+    const source = {
+      method: "oauth",
+      oauth: { providerId: "discord" },
+    } as const;
+    const first = await context.internalAdapter.createUser(
+      {
+        email: "eve@example.com",
+        name: "Eve Online!",
+        emailVerified: true,
+      },
+      source,
+    );
+    const second = await context.internalAdapter.createUser(
+      {
+        email: "eve2@example.com",
+        name: "Eve Online!",
+        emailVerified: true,
+      },
+      source,
+    );
+    const rows = await db.select({ username: users.username }).from(users);
+    expect(rows.map((row) => row.username)).toEqual([
+      expect.stringMatching(/^eveonline_[0-9a-f]{6}$/),
+      expect.stringMatching(/^eveonline_[0-9a-f]{6}$/),
+    ]);
+    expect(first.id).not.toBe(second.id);
+    expect(rows[0].username).not.toBe(rows[1].username);
+  });
+
+  it("falls back to the email or a default when the name has no usable characters", () => {
+    expect(fallbackUsername({ name: "★★", email: "Zed@x.io" })).toMatch(
+      /^player_[0-9a-f]{6}$/,
+    );
+    expect(fallbackUsername({ email: "Zed.K@x.io" })).toMatch(
+      /^zed\.k_[0-9a-f]{6}$/,
+    );
   });
 });
