@@ -4,11 +4,18 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import pg from "pg";
 
-// Neon pools DATABASE_URL through PgBouncer; session-level advisory locks
-// need the direct connection when the Vercel integration provides one.
+// The session-level advisory lock below only works on a direct connection:
+// PgBouncer in transaction mode (Neon's "-pooler" hosts) can run each query on
+// a different backend. Use the integration's unpooled URL, and refuse to
+// migrate through a pooled one rather than race unprotected.
 const connectionString =
-  process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
+  process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
 if (!connectionString) throw new Error("DATABASE_URL is required.");
+if (new URL(connectionString).hostname.includes("-pooler")) {
+  throw new Error(
+    "Migrations need a direct database connection; set DATABASE_URL_UNPOOLED.",
+  );
+}
 
 // Arbitrary constant identifying "critical-hits migrations".
 const lockId = 7_243_901;
