@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createAuth, fallbackUsername } from "@/lib/auth";
 import { accounts, sessions, users } from "@/lib/db/schema";
+import { inviteCookie, inviteToken } from "@/lib/invite";
 import {
   hasTestDatabase,
   openTestDatabase,
@@ -91,36 +92,52 @@ describe.skipIf(!hasTestDatabase)("authentication", () => {
     expect(await db.$count(users)).toBe(1);
   });
 
-  it("gives social sign-ups without a username a unique one", async () => {
-    const context = await auth.$context;
-    // The same call Better Auth makes for a first-time OAuth sign-in.
-    const source = {
-      method: "oauth",
-      oauth: { providerId: "discord" },
-    } as const;
-    const first = await context.internalAdapter.createUser(
-      {
-        email: "eve@example.com",
-        name: "Eve Online!",
-        emailVerified: true,
-      },
-      source,
-    );
-    const second = await context.internalAdapter.createUser(
-      {
-        email: "eve2@example.com",
-        name: "Eve Online!",
-        emailVerified: true,
-      },
-      source,
-    );
+  it("gives sign-ups without a username a unique one", async () => {
+    // Social sign-ups arrive without a username; an email sign-up that omits
+    // it runs the same user-creation hook through a real endpoint.
+    const signUpWithout = (email: string) =>
+      auth.api.signUpEmail({
+        body: { email, name: "Eve Online!", password: "correct horse battery" },
+      });
+    const first = await signUpWithout("eve@example.com");
+    const second = await signUpWithout("eve2@example.com");
     const rows = await db.select({ username: users.username }).from(users);
     expect(rows.map((row) => row.username)).toEqual([
       expect.stringMatching(/^eveonline_[0-9a-f]{8}$/),
       expect.stringMatching(/^eveonline_[0-9a-f]{8}$/),
     ]);
-    expect(first.id).not.toBe(second.id);
+    expect(first.user.id).not.toBe(second.user.id);
     expect(rows[0].username).not.toBe(rows[1].username);
+  });
+
+  it("refuses new accounts without the invite while one is required", async () => {
+    process.env.SIGNUP_INVITE_CODE = "level-up";
+    try {
+      await expect(
+        auth.api.signUpEmail({
+          body: {
+            email: "gatecrasher@example.com",
+            name: "Gate",
+            username: "gatecrasher",
+            password: "correct horse battery",
+          },
+        }),
+      ).rejects.toThrow(/invite_required/);
+      const invited = await auth.api.signUpEmail({
+        body: {
+          email: "friend@example.com",
+          name: "Friend",
+          username: "friend",
+          password: "correct horse battery",
+        },
+        headers: new Headers({
+          cookie: `${inviteCookie}=${inviteToken("level-up")}`,
+        }),
+      });
+      expect(invited.user.email).toBe("friend@example.com");
+    } finally {
+      delete process.env.SIGNUP_INVITE_CODE;
+    }
   });
 
   it("falls back to the email or a default when the name has no usable characters", () => {
