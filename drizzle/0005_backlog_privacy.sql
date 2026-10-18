@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "backlog_public" boolean DEFAULT true NOT NULL;

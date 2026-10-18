@@ -65,6 +65,8 @@ export const users = pgTable(
     displayName: text("display_name"),
     avatarUrl: text("avatar_url"),
     bio: text("bio"),
+    // Whether other players see this player's backlog on their profile.
+    backlogPublic: boolean("backlog_public").notNull().default(true),
     favouriteGameIds: integer("favourite_game_ids")
       .array()
       .notNull()

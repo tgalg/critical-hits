@@ -74,11 +74,13 @@ describe.skipIf(!hasTestDatabase)("profiles", () => {
       username: "Ana.Plays",
       displayName: "Ana",
       bio: "Roguelikes.",
+      backlogPublic: true,
     });
     expect(await getAccount(db, "ana")).toEqual({
       username: "Ana.Plays",
       displayName: "Ana",
       bio: "Roguelikes.",
+      backlogPublic: true,
     });
     const [row] = await db.select().from(users).where(eq(users.id, "ana"));
     expect(row.username).toBe("ana.plays");
@@ -88,6 +90,7 @@ describe.skipIf(!hasTestDatabase)("profiles", () => {
         username: "ANA.PLAYS",
         displayName: null,
         bio: null,
+        backlogPublic: true,
       }),
     ).rejects.toThrow(ProfileError);
     expect((await getProfile(db, "ANA.plays", 2026))?.user.id).toBe("ana");
@@ -187,8 +190,27 @@ describe.skipIf(!hasTestDatabase)("profiles", () => {
       "So far so good.",
     ]);
     expect(profile.lists).toEqual([{ id: open, title: "Open", gameCount: 1 }]);
-    expect(profile.backlog.map((entry) => entry.game.title)).toEqual([
+    expect(profile.backlog?.map((entry) => entry.game.title)).toEqual([
       "outer-wilds",
     ]);
+  });
+
+  it("shows a private backlog only to its owner", async () => {
+    await addToBacklog(db, "ana", game.get("outer-wilds")!, null);
+    await updateProfile(db, "ana", {
+      username: "ana",
+      displayName: null,
+      bio: null,
+      backlogPublic: false,
+    });
+    for (const viewer of [null, "ben"]) {
+      const profile = (await getProfile(db, "ana", 2026, viewer))!;
+      expect(profile.backlog).toBeNull();
+      expect(profile.stats.backlog).toBeNull();
+    }
+    const own = (await getProfile(db, "ana", 2026, "ana"))!;
+    expect(own.backlog).toHaveLength(1);
+    expect(own.stats.backlog).toBe(1);
+    expect((await getAccount(db, "ana"))?.backlogPublic).toBe(false);
   });
 });

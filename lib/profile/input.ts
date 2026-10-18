@@ -7,9 +7,12 @@ export type ProfileInput = {
   username: string;
   displayName: string | null;
   bio: string | null;
+  backlogPublic: boolean;
 };
 
-export type ProfileErrors = Partial<Record<keyof ProfileInput, string>>;
+export type ProfileErrors = Partial<
+  Record<"username" | "displayName" | "bio", string>
+>;
 
 export type ParsedProfile =
   { ok: true; value: ProfileInput } | { ok: false; errors: ProfileErrors };
@@ -39,6 +42,12 @@ export function parseProfileForm(form: FormLike): ParsedProfile {
   if (Object.keys(errors).length > 0) return { ok: false, errors };
   return {
     ok: true,
-    value: { username, displayName: displayName || null, bio: bio || null },
+    value: {
+      username,
+      displayName: displayName || null,
+      bio: bio || null,
+      // An unticked checkbox isn't submitted at all.
+      backlogPublic: form.get("backlogPublic") === "on",
+    },
   };
 }
