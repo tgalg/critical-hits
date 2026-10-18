@@ -36,7 +36,7 @@ async function visibleTargetOwner(
 
 // Likes or unlikes a review or public list and returns whether the player
 // now likes it. Players can't like their own; reviews keep a running
-// like_count, lists are counted on read.
+// like_count (maintained by a database trigger), lists are counted on read.
 export async function setLike(
   db: Database,
   userId: string,
@@ -53,20 +53,14 @@ export async function setLike(
       eq(likes.targetType, type),
       eq(likes.targetId, id),
     );
-    const changed = liked
-      ? await tx
-          .insert(likes)
-          .values({ userId, targetType: type, targetId: id })
-          .onConflictDoNothing()
-          .returning({ id: likes.targetId })
-      : await tx.delete(likes).where(target).returning({ id: likes.targetId });
-    if (type === "review" && changed.length > 0) {
+    // A trigger keeps reviews.like_count in step (drizzle/0003).
+    if (liked) {
       await tx
-        .update(reviews)
-        .set({
-          likeCount: sql`${reviews.likeCount} + ${liked ? 1 : -1}`,
-        })
-        .where(eq(reviews.id, id));
+        .insert(likes)
+        .values({ userId, targetType: type, targetId: id })
+        .onConflictDoNothing();
+    } else {
+      await tx.delete(likes).where(target);
     }
     return liked;
   });
