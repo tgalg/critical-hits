@@ -3,10 +3,17 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   resolve: {
-    alias: { "@": fileURLToPath(new URL("./", import.meta.url)) },
+    alias: {
+      "@": fileURLToPath(new URL("./", import.meta.url)),
+      "server-only": fileURLToPath(
+        new URL("./test/server-only.ts", import.meta.url),
+      ),
+    },
   },
   test: {
     environment: "node",
+    // Database suites share one disposable database, so files run one at a time.
+    fileParallelism: false,
     include: ["**/*.test.{ts,tsx}"],
     exclude: ["node_modules/**", ".next/**", "e2e/**"],
   },

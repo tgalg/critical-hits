@@ -2,8 +2,8 @@
 
 A social diary for video games, built with Next.js App Router, strict TypeScript,
 Tailwind CSS, and shadcn/ui. This first slice provides a placeholder home page and
-development tooling, plus the MVP database schema. Authentication and game data
-come later.
+development tooling, the MVP database schema, and accounts (email or username
+with a password, plus optional Discord sign-in). Game data comes later.
 
 ## Local setup (PowerShell)
 
@@ -63,7 +63,14 @@ The browser smoke test is run separately and is not part of `pnpm check`.
 - `lib/utils.ts`: shared `cn` class utility; `lib/utils.test.ts` is its sample test.
 - `lib/db/`: lazy, server-only Drizzle connection and the MVP schema (`schema.ts`),
   with database tests in `schema.db.test.ts`.
-- `e2e/`: Playwright smoke test, isolated from Vitest's `*.test.ts` discovery.
+- `lib/auth.ts`: Better Auth server config mapped onto the `users`, `sessions`,
+  `accounts` and `verifications` tables; `lib/auth-client.ts` is the browser
+  client. The API lives at `app/api/auth/[...all]`, with pages at `/sign-up`,
+  `/sign-in` and `/account`. Set `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` in
+  `.env`; Discord sign-in turns on only when `DISCORD_CLIENT_ID` and
+  `DISCORD_CLIENT_SECRET` are both set.
+- `e2e/`: Playwright smoke and auth tests (the auth test needs a migrated
+  `DATABASE_URL`), isolated from Vitest's `*.test.ts` discovery.
 - `drizzle.config.ts`: PostgreSQL migration configuration; requires `DATABASE_URL`.
 - `drizzle/`: generated migrations, starting with `0000_init.sql` (which also
   enables `pg_trgm`). Run `pnpm db:migrate` after pulling schema changes, and
