@@ -14,6 +14,7 @@ import { statusOptions } from "@/lib/logs/form-defaults";
 import { getBacklogEntry } from "@/lib/backlog/service";
 import { getUserLists } from "@/lib/lists/service";
 import { getFavouriteIds } from "@/lib/profile/service";
+import { getLikedIds } from "@/lib/social/likes";
 import { getGameReviews, getUserLogsForGame } from "@/lib/logs/service";
 import { getCurrentUser } from "@/lib/session";
 
@@ -40,6 +41,12 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
       ])
     : [[], null, [], []];
   const reviews = await getGameReviews(getDatabase(), game.id);
+  const likedReviews = await getLikedIds(
+    getDatabase(),
+    user?.id ?? null,
+    "review",
+    reviews.map((review) => review.id),
+  );
 
   return (
     <main className="mx-auto max-w-4xl px-6 py-12">
@@ -163,7 +170,12 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
         <h2 id="reviews" className="text-xl font-semibold">
           Reviews
         </h2>
-        <GameReviews reviews={reviews} />
+        <GameReviews
+          reviews={reviews}
+          viewerId={user?.id ?? null}
+          liked={likedReviews}
+          path={`/games/${game.slug}`}
+        />
       </section>
     </main>
   );

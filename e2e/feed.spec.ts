@@ -17,7 +17,7 @@ test.beforeAll(async () => {
   await pool.end();
 });
 
-test("follows a player found by search and sees their review in the feed", async ({
+test("follows a player found by search, sees and likes their review", async ({
   browser,
 }) => {
   const stamp = Date.now();
@@ -51,5 +51,25 @@ test("follows a player found by search and sees their review in the feed", async
   await expect(feed).toContainText("reviewed E2E Feed Game");
   await expect(feed.getByLabel("Rated 4 out of 5")).toBeVisible();
   await expect(feed).toContainText("Feed-worthy, honestly.");
+
+  // Likes count once per player and can be taken back.
+  await feed
+    .getByRole("button", { name: `Like ${writerName}'s review` })
+    .click();
+  const unlike = feed.getByRole("button", {
+    name: `Unlike ${writerName}'s review`,
+  });
+  await expect(unlike).toHaveText("♥ 1 like");
+  await reader.goto(`/games/${slug}`);
+  await expect(
+    reader
+      .getByRole("region", { name: "Reviews" })
+      .getByRole("button", { name: `Unlike ${writerName}'s review` }),
+  ).toHaveText("♥ 1 like");
+  await reader.goto("/");
+  await unlike.click();
+  await expect(
+    feed.getByRole("button", { name: `Like ${writerName}'s review` }),
+  ).toHaveText("♥ 0 likes");
   await reader.close();
 });

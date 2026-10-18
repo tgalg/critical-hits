@@ -62,9 +62,11 @@ export async function recomputeGameRating(
   `);
 }
 
-// Likes and activities point at a review polymorphically, with no foreign key,
-// so they are removed by hand before the review itself.
+// Likes and activities point at a review polymorphically, with no foreign
+// key, so they are removed by hand. The review goes first: a like being
+// written holds a lock on it, so this waits for that like and then sees it.
 async function deleteReview(tx: Transaction, reviewId: number) {
+  await tx.delete(reviews).where(eq(reviews.id, reviewId));
   await tx
     .delete(likes)
     .where(and(eq(likes.targetType, "review"), eq(likes.targetId, reviewId)));
@@ -76,7 +78,6 @@ async function deleteReview(tx: Transaction, reviewId: number) {
         eq(activities.objectId, reviewId),
       ),
     );
-  await tx.delete(reviews).where(eq(reviews.id, reviewId));
 }
 
 // Makes the log's review match the form: creates it (with a `reviewed`
@@ -291,6 +292,8 @@ export async function getGameReviews(db: Database, gameId: number) {
       ...reviewColumns,
       createdAt: reviews.createdAt,
       rating: logs.rating,
+      likeCount: reviews.likeCount,
+      authorId: logs.userId,
       author: sql<string>`coalesce(${users.displayUsername}, ${users.username})`,
     })
     .from(reviews)

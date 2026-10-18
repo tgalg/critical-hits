@@ -14,6 +14,8 @@ import { getDatabase } from "@/lib/db";
 import { listLimits } from "@/lib/lists/input";
 import { getList } from "@/lib/lists/service";
 import { getCurrentUser } from "@/lib/session";
+import { LikeButton } from "@/components/social/like-button";
+import { getLikedIds, getListLikeCount } from "@/lib/social/likes";
 
 const smallButton =
   "rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted";
@@ -39,6 +41,10 @@ export default async function ListPage(props: PageProps<"/lists/[id]">) {
   const { list, user } = await loadList((await props.params).id);
   if (!list) notFound();
   const owner = user?.id === list.userId;
+  const [likeCount, liked] = await Promise.all([
+    getListLikeCount(getDatabase(), list.id),
+    getLikedIds(getDatabase(), user?.id ?? null, "list", [list.id]),
+  ]);
   const items = list.items;
   const hidden = (name: string, value: string | number) => (
     <input type="hidden" name={name} value={value} />
@@ -63,6 +69,17 @@ export default async function ListPage(props: PageProps<"/lists/[id]">) {
           </Link>
           {!list.isPublic && " · Private"}
         </p>
+        {list.isPublic && (
+          <LikeButton
+            type="list"
+            id={list.id}
+            count={likeCount}
+            liked={liked.has(list.id)}
+            canLike={!!user && !owner}
+            path={`/lists/${list.id}`}
+            label={list.title}
+          />
+        )}
         {list.description && (
           <p className="leading-relaxed whitespace-pre-line">
             {list.description}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { LikeButton } from "@/components/social/like-button";
 import { stars } from "@/lib/logs/input";
 
 const dateFormat = new Intl.DateTimeFormat("en", {
@@ -15,6 +16,8 @@ type Review = {
   createdAt: Date;
   body: string;
   containsSpoilers: boolean;
+  likeCount: number;
+  authorId: string;
 };
 
 // Plain text with the writer's line breaks; no HTML or Markdown.
@@ -22,7 +25,17 @@ export function ReviewBody({ body }: { body: string }) {
   return <p className="leading-relaxed whitespace-pre-line">{body}</p>;
 }
 
-export function GameReviews({ reviews }: { reviews: Review[] }) {
+export function GameReviews({
+  reviews,
+  viewerId,
+  liked,
+  path,
+}: {
+  reviews: Review[];
+  viewerId: string | null;
+  liked: Set<number>;
+  path: string;
+}) {
   if (reviews.length === 0) {
     return <p className="text-muted-foreground">No reviews yet.</p>;
   }
@@ -61,6 +74,15 @@ export function GameReviews({ reviews }: { reviews: Review[] }) {
           ) : (
             <ReviewBody body={review.body} />
           )}
+          <LikeButton
+            type="review"
+            id={review.id}
+            count={review.likeCount}
+            liked={liked.has(review.id)}
+            canLike={viewerId !== null && viewerId !== review.authorId}
+            path={path}
+            label={`${review.author}'s review`}
+          />
         </li>
       ))}
     </ul>

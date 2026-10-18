@@ -184,6 +184,7 @@ export async function getProfile(db: Database, username: string, year: number) {
         containsSpoilers: reviews.containsSpoilers,
         createdAt: reviews.createdAt,
         rating: logs.rating,
+        likeCount: reviews.likeCount,
         game: { slug: games.slug, title: games.title },
       })
       .from(reviews)

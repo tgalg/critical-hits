@@ -4,6 +4,7 @@ import { PlayerSearch } from "@/components/social/player-search";
 import { Card, CardContent } from "@/components/ui/card";
 import { getDatabase } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { getLikedIds } from "@/lib/social/likes";
 import { getFeed } from "@/lib/social/service";
 
 // Signed-in players get the feed of people they follow; everyone else gets
@@ -16,6 +17,23 @@ export default async function Home(props: PageProps<"/">) {
     const page =
       Number.isSafeInteger(requested) && requested > 1 ? requested : 1;
     const { entries, hasMore } = await getFeed(getDatabase(), user.id, page);
+    const ids = (
+      pick: (entry: (typeof entries)[number]) => number | undefined,
+    ) => entries.map(pick).filter((id): id is number => id !== undefined);
+    const [likedReviews, likedLists] = await Promise.all([
+      getLikedIds(
+        getDatabase(),
+        user.id,
+        "review",
+        ids((e) => e.review?.id),
+      ),
+      getLikedIds(
+        getDatabase(),
+        user.id,
+        "list",
+        ids((e) => e.list?.id),
+      ),
+    ]);
     return (
       <main className="mx-auto max-w-2xl space-y-6 px-6 py-12">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -35,7 +53,12 @@ export default async function Home(props: PageProps<"/">) {
             <PlayerSearch />
           </div>
         ) : (
-          <Feed entries={entries} />
+          <Feed
+            entries={entries}
+            viewerId={user.id}
+            likedReviews={likedReviews}
+            likedLists={likedLists}
+          />
         )}
         {(page > 1 || hasMore) && (
           <nav aria-label="Feed pages" className="flex justify-between text-sm">

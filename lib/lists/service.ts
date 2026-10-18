@@ -63,7 +63,10 @@ export async function deleteList(db: Database, userId: string, listId: number) {
   await db.transaction(async (tx) => {
     await lockList(tx, userId, listId);
     // Items go with the list through the foreign key, but likes and
-    // activities point at it polymorphically, so remove those by hand.
+    // activities point at it polymorphically, so remove those by hand. The
+    // list goes first: a like being written holds a share lock on it, so
+    // this waits for that like and then sees it.
+    await tx.delete(lists).where(eq(lists.id, listId));
     await tx
       .delete(likes)
       .where(and(eq(likes.targetType, "list"), eq(likes.targetId, listId)));
@@ -72,7 +75,6 @@ export async function deleteList(db: Database, userId: string, listId: number) {
       .where(
         and(eq(activities.objectType, "list"), eq(activities.objectId, listId)),
       );
-    await tx.delete(lists).where(eq(lists.id, listId));
   });
 }
 

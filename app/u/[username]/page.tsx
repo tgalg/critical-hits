@@ -11,6 +11,8 @@ import { getProfile, maxFavourites } from "@/lib/profile/service";
 import { getCurrentUser } from "@/lib/session";
 import { getFollowState } from "@/lib/social/service";
 import { FollowButton } from "@/components/social/follow-button";
+import { LikeButton } from "@/components/social/like-button";
+import { getLikedIds } from "@/lib/social/likes";
 
 // Metadata and the page share one load per request. Next.js has already
 // decoded the username segment.
@@ -56,11 +58,15 @@ export default async function ProfilePage(props: PageProps<"/u/[username]">) {
   if (!profile) notFound();
   const viewer = await getCurrentUser();
   const own = viewer?.id === profile.user.id;
-  const followState = await getFollowState(
-    getDatabase(),
-    profile.user.id,
-    viewer?.id ?? null,
-  );
+  const [followState, likedReviews] = await Promise.all([
+    getFollowState(getDatabase(), profile.user.id, viewer?.id ?? null),
+    getLikedIds(
+      getDatabase(),
+      viewer?.id ?? null,
+      "review",
+      profile.recentReviews.map((review) => review.id),
+    ),
+  ]);
   const { user, stats } = profile;
   const statItems = [
     { label: "Games played", value: stats.gamesPlayed },
@@ -195,6 +201,15 @@ export default async function ProfilePage(props: PageProps<"/u/[username]">) {
                 ) : (
                   <ReviewBody body={review.body} />
                 )}
+                <LikeButton
+                  type="review"
+                  id={review.id}
+                  count={review.likeCount}
+                  liked={likedReviews.has(review.id)}
+                  canLike={!!viewer && !own}
+                  path={`/u/${user.username}`}
+                  label={`review of ${review.game.title}`}
+                />
               </li>
             ))}
           </ul>

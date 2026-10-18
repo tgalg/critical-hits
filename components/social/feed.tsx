@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GameCover } from "@/components/catalog/game-cover";
 import { ReviewBody } from "@/components/logs/game-reviews";
+import { LikeButton } from "@/components/social/like-button";
 import { stars, statusLabels, type LogStatus } from "@/lib/logs/input";
 
 const timeFormat = new Intl.DateTimeFormat("en", {
@@ -13,6 +14,7 @@ type Entry = {
   id: number;
   verb: "logged" | "reviewed" | "created_list";
   createdAt: Date;
+  actorId: string;
   actor: string;
   log: {
     status: LogStatus;
@@ -20,9 +22,14 @@ type Entry = {
     hearted: boolean;
     isReplay: boolean;
   } | null;
-  review: { body: string; containsSpoilers: boolean } | null;
+  review: {
+    id: number;
+    body: string;
+    containsSpoilers: boolean;
+    likeCount: number;
+  } | null;
   reviewRating: number | null;
-  list: { id: number; title: string } | null;
+  list: { id: number; title: string; likeCount: number } | null;
   game: { slug: string; title: string; coverUrl: string | null } | null;
 };
 
@@ -87,7 +94,17 @@ function Summary({ entry }: { entry: Entry }) {
   );
 }
 
-export function Feed({ entries }: { entries: Entry[] }) {
+export function Feed({
+  entries,
+  viewerId,
+  likedReviews,
+  likedLists,
+}: {
+  entries: Entry[];
+  viewerId: string;
+  likedReviews: Set<number>;
+  likedLists: Set<number>;
+}) {
   return (
     <ul className="divide-y rounded-lg border">
       {entries.map((entry) => (
@@ -118,12 +135,36 @@ export function Feed({ entries }: { entries: Entry[] }) {
                   <ReviewBody body={entry.review.body} />
                 </div>
               ))}
-            <time
-              dateTime={entry.createdAt.toISOString()}
-              className="block text-xs text-muted-foreground"
-            >
-              {timeFormat.format(entry.createdAt)}
-            </time>
+            <p className="flex items-center gap-3">
+              <time
+                dateTime={entry.createdAt.toISOString()}
+                className="text-xs text-muted-foreground"
+              >
+                {timeFormat.format(entry.createdAt)}
+              </time>
+              {entry.review && (
+                <LikeButton
+                  type="review"
+                  id={entry.review.id}
+                  count={entry.review.likeCount}
+                  liked={likedReviews.has(entry.review.id)}
+                  canLike={entry.actorId !== viewerId}
+                  path="/"
+                  label={`${entry.actor}'s review`}
+                />
+              )}
+              {entry.list && (
+                <LikeButton
+                  type="list"
+                  id={entry.list.id}
+                  count={entry.list.likeCount}
+                  liked={likedLists.has(entry.list.id)}
+                  canLike={entry.actorId !== viewerId}
+                  path="/"
+                  label={entry.list.title}
+                />
+              )}
+            </p>
           </div>
         </li>
       ))}

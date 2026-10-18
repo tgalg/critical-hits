@@ -16,6 +16,7 @@ import {
   activities,
   follows,
   games,
+  likes,
   lists,
   logs,
   reviews,
@@ -129,6 +130,7 @@ export async function getFeed(db: Database, viewerId: string, page = 1) {
       id: activities.id,
       verb: activities.verb,
       createdAt: activities.createdAt,
+      actorId: activities.actorId,
       actor: shownName,
       log: {
         id: logs.id,
@@ -141,10 +143,15 @@ export async function getFeed(db: Database, viewerId: string, page = 1) {
         id: reviews.id,
         body: reviews.body,
         containsSpoilers: reviews.containsSpoilers,
+        likeCount: reviews.likeCount,
       },
       // The rating on the reviewed play.
       reviewRating: reviewLog.rating,
-      list: { id: lists.id, title: lists.title },
+      list: {
+        id: lists.id,
+        title: lists.title,
+        likeCount: sql<number>`(select count(*)::int from ${likes} where ${likes.targetType} = 'list' and ${likes.targetId} = ${lists.id})`,
+      },
       game: { slug: games.slug, title: games.title, coverUrl: games.coverUrl },
     })
     .from(activities)
