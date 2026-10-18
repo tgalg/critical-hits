@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { GameReviews } from "@/components/logs/game-reviews";
 import { Feed } from "@/components/social/feed";
 import { PlayerSearch } from "@/components/social/player-search";
 import { Card, CardContent } from "@/components/ui/card";
 import { getDatabase } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { getLikedIds } from "@/lib/social/likes";
-import { getFeed } from "@/lib/social/service";
+import { getFeed, getPopularReviews } from "@/lib/social/service";
 
 // Signed-in players get the feed of people they follow; everyone else gets
 // the landing page.
@@ -17,16 +18,19 @@ export default async function Home(props: PageProps<"/">) {
     const page =
       Number.isSafeInteger(requested) && requested > 1 ? requested : 1;
     const { entries, hasMore } = await getFeed(getDatabase(), user.id, page);
+    const empty = entries.length === 0 && page === 1;
+    // An empty feed shows what the community likes instead.
+    const popular = empty
+      ? await getPopularReviews(getDatabase(), user.id)
+      : [];
     const ids = (
       pick: (entry: (typeof entries)[number]) => number | undefined,
     ) => entries.map(pick).filter((id): id is number => id !== undefined);
     const [likedReviews, likedLists] = await Promise.all([
-      getLikedIds(
-        getDatabase(),
-        user.id,
-        "review",
-        ids((e) => e.review?.id),
-      ),
+      getLikedIds(getDatabase(), user.id, "review", [
+        ...ids((e) => e.review?.id),
+        ...popular.map((review) => review.id),
+      ]),
       getLikedIds(
         getDatabase(),
         user.id,
@@ -44,13 +48,26 @@ export default async function Home(props: PageProps<"/">) {
             Find players
           </Link>
         </div>
-        {entries.length === 0 && page === 1 ? (
+        {empty ? (
           <div className="space-y-4">
             <p className="text-muted-foreground">
               Nothing here yet. Follow players to see what they play, review and
               collect.
             </p>
             <PlayerSearch />
+            {popular.length > 0 && (
+              <section aria-labelledby="popular" className="space-y-4 pt-4">
+                <h2 id="popular" className="text-xl font-semibold">
+                  Popular reviews
+                </h2>
+                <GameReviews
+                  reviews={popular}
+                  viewerId={user.id}
+                  liked={likedReviews}
+                  path="/"
+                />
+              </section>
+            )}
           </div>
         ) : (
           <Feed

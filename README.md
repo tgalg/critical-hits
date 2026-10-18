@@ -100,7 +100,8 @@ The browser tests are run separately and is not part of `pnpm check`.
 - `lib/social/`: one-way follows, player search (`/players`) and the home
   feed. Signed-in players see activity from the people they follow at `/`;
   a play logged with a review shows once, and hidden reviews and private
-  lists stay out. Players like other players' reviews and public lists
+  lists stay out. An empty feed shows other players' popular reviews
+  instead. Players like other players' reviews and public lists
   (`lib/social/likes.ts`); reviews keep a running `like_count`, kept
   in step by a trigger on `likes`.
 - `lib/moderation/` and `app/admin/`: players report other players' reviews

@@ -7,6 +7,7 @@ import {
   ilike,
   inArray,
   isNull,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -201,4 +202,35 @@ export async function getFeed(db: Database, viewerId: string, page = 1) {
     entries: rows.slice(0, feedPageSize),
     hasMore: rows.length > feedPageSize,
   };
+}
+
+export const popularReviewsLimit = 10;
+
+// Other players' most-liked visible reviews, the last month's first, for a
+// feed with nothing in it yet.
+export async function getPopularReviews(db: Database, viewerId: string) {
+  return db
+    .select({
+      id: reviews.id,
+      body: reviews.body,
+      containsSpoilers: reviews.containsSpoilers,
+      createdAt: reviews.createdAt,
+      likeCount: reviews.likeCount,
+      rating: logs.rating,
+      authorId: logs.userId,
+      author: sql<string>`coalesce(${users.displayUsername}, ${users.username})`,
+      game: { slug: games.slug, title: games.title },
+    })
+    .from(reviews)
+    .innerJoin(logs, eq(logs.id, reviews.logId))
+    .innerJoin(users, eq(users.id, logs.userId))
+    .innerJoin(games, eq(games.id, logs.gameId))
+    .where(and(isNull(reviews.hiddenAt), ne(logs.userId, viewerId)))
+    .orderBy(
+      desc(sql`${reviews.createdAt} > now() - interval '30 days'`),
+      desc(reviews.likeCount),
+      desc(reviews.createdAt),
+      desc(reviews.id),
+    )
+    .limit(popularReviewsLimit);
 }

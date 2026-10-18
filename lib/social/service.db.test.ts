@@ -12,11 +12,13 @@ import {
 import { createList } from "@/lib/lists/service";
 import type { LogInput } from "@/lib/logs/input";
 import { createLog } from "@/lib/logs/service";
+import { setLike } from "@/lib/social/likes";
 import {
   feedPageSize,
   follow,
   getFeed,
   getFollowState,
+  getPopularReviews,
   searchPlayers,
   SocialError,
   unfollow,
@@ -228,5 +230,48 @@ describe.skipIf(!hasTestDatabase)("social", () => {
     // Activities whose list never existed are skipped, not counted.
     expect(second.entries).toHaveLength(2);
     expect(second.hasMore).toBe(false);
+  });
+
+  it("lists other players' visible reviews, recent and liked first", async () => {
+    const review = async (userId: string, body: string) => {
+      const logId = await createLog(
+        db,
+        userId,
+        hades,
+        play({ review: { body, containsSpoilers: false } }),
+      );
+      const [row] = await db
+        .select({ id: reviews.id })
+        .from(reviews)
+        .where(eq(reviews.logId, logId));
+      return row.id;
+    };
+    const old = await review("ben", "Old favourite");
+    const liked = await review("ben", "Liked");
+    await review("cy", "Plain");
+    const hidden = await review("cy", "Hidden");
+    await review("ana", "Mine");
+    await setLike(db, "ana", "review", old, true);
+    await setLike(db, "ana", "review", liked, true);
+    await db
+      .update(reviews)
+      .set({ createdAt: sql`now() - interval '60 days'` })
+      .where(eq(reviews.id, old));
+    await db
+      .update(reviews)
+      .set({ hiddenAt: sql`now()` })
+      .where(eq(reviews.id, hidden));
+
+    const popular = await getPopularReviews(db, "ana");
+    expect(popular.map((r) => r.body)).toEqual([
+      "Liked",
+      "Plain",
+      "Old favourite",
+    ]);
+    expect(popular[0]).toMatchObject({
+      author: "ben",
+      likeCount: 1,
+      game: { slug: "hades" },
+    });
   });
 });
