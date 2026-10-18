@@ -5,14 +5,17 @@ import {
   activities,
   backlogItems,
   games,
+  likes,
   logs,
   platforms,
+  reviews,
   users,
 } from "@/lib/db/schema";
 import type { LogInput } from "@/lib/logs/input";
 import {
   createLog,
   deleteLog,
+  diaryPageSize,
   getDiary,
   getOwnedLog,
   getUserLogsForGame,
@@ -192,11 +195,53 @@ describe.skipIf(!hasTestDatabase)("logs", () => {
     );
     await createLog(db, "ana", hades, play({ finishedOn: "2025-12-24" }));
     await createLog(db, "ben", celeste, play({ finishedOn: "2026-06-01" }));
-    const diary = await getDiary(db, "ana");
+    const { entries: diary, hasMore } = await getDiary(db, "ana");
+    expect(hasMore).toBe(false);
     expect(diary.map((entry) => [entry.game.title, entry.diaryDate])).toEqual([
       ["Celeste", "2026-05-01"],
       ["Hades", "2026-03-10"],
       ["Hades", "2025-12-24"],
     ]);
+  });
+
+  it("pages through a long diary without dropping entries", async () => {
+    const total = diaryPageSize * 2 + 3;
+    await db.insert(logs).values(
+      Array.from({ length: total }, (_, i) => ({
+        userId: "ana",
+        gameId: hades,
+        status: "finished" as const,
+        finishedOn: `2026-01-01`,
+        hours: String(i),
+      })),
+    );
+    const pages = [];
+    for (let page = 1; ; page++) {
+      const result = await getDiary(db, "ana", page);
+      pages.push(result.entries.length);
+      if (!result.hasMore) break;
+    }
+    expect(pages).toEqual([diaryPageSize, diaryPageSize, 3]);
+  });
+
+  it("removes a deleted log's review likes and activity", async () => {
+    const id = await createLog(db, "ana", hades, play());
+    const [review] = await db
+      .insert(reviews)
+      .values({ logId: id, body: "Loved it." })
+      .returning();
+    await db
+      .insert(likes)
+      .values({ userId: "ben", targetType: "review", targetId: review.id });
+    await db.insert(activities).values({
+      actorId: "ana",
+      verb: "reviewed",
+      objectType: "review",
+      objectId: review.id,
+    });
+    await deleteLog(db, "ana", id);
+    expect(await db.$count(reviews)).toBe(0);
+    expect(await db.$count(likes)).toBe(0);
+    expect(await db.$count(activities)).toBe(0);
   });
 });

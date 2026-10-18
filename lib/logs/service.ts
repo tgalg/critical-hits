@@ -5,8 +5,10 @@ import {
   backlogItems,
   gamePlatforms,
   games,
+  likes,
   logs,
   platforms,
+  reviews,
 } from "@/lib/db/schema";
 import type { LogInput } from "@/lib/logs/input";
 
@@ -132,6 +134,27 @@ export async function deleteLog(db: Database, userId: string, logId: number) {
   return db.transaction(async (tx) => {
     const { gameId } = await ownedLog(tx, userId, logId);
     await lockGame(tx, gameId);
+    // The log's review goes with it through the foreign key, but likes and
+    // activities point at it polymorphically, so remove those by hand.
+    const [review] = await tx
+      .select({ id: reviews.id })
+      .from(reviews)
+      .where(eq(reviews.logId, logId));
+    if (review) {
+      await tx
+        .delete(likes)
+        .where(
+          and(eq(likes.targetType, "review"), eq(likes.targetId, review.id)),
+        );
+      await tx
+        .delete(activities)
+        .where(
+          and(
+            eq(activities.objectType, "review"),
+            eq(activities.objectId, review.id),
+          ),
+        );
+    }
     await tx
       .delete(logs)
       .where(and(eq(logs.id, logId), eq(logs.userId, userId)));
@@ -178,8 +201,11 @@ export async function getUserLogsForGame(
 // start date, else the day the log was written.
 const diaryDate = sql<string>`coalesce(${logs.finishedOn}, ${logs.startedOn}, (${logs.createdAt} AT TIME ZONE 'UTC')::date)::text`;
 
-export async function getDiary(db: Database, userId: string, limit = 200) {
-  return db
+export const diaryPageSize = 50;
+
+// One page of the diary, plus whether older entries remain.
+export async function getDiary(db: Database, userId: string, page = 1) {
+  const rows = await db
     .select({
       ...logColumns,
       diaryDate,
@@ -190,7 +216,12 @@ export async function getDiary(db: Database, userId: string, limit = 200) {
     .leftJoin(platforms, eq(platforms.id, logs.platformId))
     .where(eq(logs.userId, userId))
     .orderBy(desc(diaryDate), desc(logs.createdAt), desc(logs.id))
-    .limit(limit);
+    .limit(diaryPageSize + 1)
+    .offset((page - 1) * diaryPageSize);
+  return {
+    entries: rows.slice(0, diaryPageSize),
+    hasMore: rows.length > diaryPageSize,
+  };
 }
 
 export async function getOwnedLog(db: Database, userId: string, logId: number) {

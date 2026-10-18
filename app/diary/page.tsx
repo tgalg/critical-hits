@@ -15,10 +15,13 @@ const monthFormat = new Intl.DateTimeFormat("en", {
   timeZone: "UTC",
 });
 
-export default async function DiaryPage() {
+export default async function DiaryPage(props: PageProps<"/diary">) {
   const user = await getCurrentUser();
   if (!user) redirect("/sign-in");
-  const entries = await getDiary(getDatabase(), user.id);
+  const { page: pageParam } = await props.searchParams;
+  const requested = Number(pageParam);
+  const page = Number.isSafeInteger(requested) && requested > 1 ? requested : 1;
+  const { entries, hasMore } = await getDiary(getDatabase(), user.id, page);
 
   // Entries arrive newest first; group consecutive ones by month.
   const months: { label: string; entries: typeof entries }[] = [];
@@ -31,7 +34,7 @@ export default async function DiaryPage() {
   return (
     <main className="mx-auto max-w-3xl space-y-8 px-6 py-12">
       <h1 className="text-3xl font-semibold tracking-tight">Your diary</h1>
-      {months.length === 0 && (
+      {months.length === 0 && page === 1 && (
         <p className="text-muted-foreground">
           Nothing logged yet.{" "}
           <Link href="/games" className="underline">
@@ -77,6 +80,25 @@ export default async function DiaryPage() {
           </ul>
         </section>
       ))}
+      {(page > 1 || hasMore) && (
+        <nav aria-label="Diary pages" className="flex justify-between text-sm">
+          {page > 1 ? (
+            <Link
+              href={page === 2 ? "/diary" : `/diary?page=${page - 1}`}
+              className="underline"
+            >
+              Newer entries
+            </Link>
+          ) : (
+            <span />
+          )}
+          {hasMore && (
+            <Link href={`/diary?page=${page + 1}`} className="underline">
+              Older entries
+            </Link>
+          )}
+        </nav>
+      )}
     </main>
   );
 }
