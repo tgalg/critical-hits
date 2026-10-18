@@ -125,6 +125,28 @@ export const gamePlatforms = pgTable(
   ],
 );
 
+export const genres = pgTable("genres", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  igdbId: integer("igdb_id").notNull().unique(),
+  name: text("name").notNull(),
+});
+
+export const gameGenres = pgTable(
+  "game_genres",
+  {
+    gameId: integer("game_id")
+      .notNull()
+      .references(() => games.id, { onDelete: "cascade" }),
+    genreId: integer("genre_id")
+      .notNull()
+      .references(() => genres.id, { onDelete: "cascade" }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.gameId, t.genreId] }),
+    index("game_genres_genre_idx").on(t.genreId),
+  ],
+);
+
 // One row per play of a game by a user; the diary is logs ordered by date.
 export const logs = pgTable(
   "logs",

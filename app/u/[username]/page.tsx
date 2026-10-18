@@ -125,6 +125,12 @@ export default async function ProfilePage(props: PageProps<"/u/[username]">) {
           </div>
         ))}
       </dl>
+      {stats.topGenres.length > 0 && (
+        <p className="text-sm text-muted-foreground">
+          Top genres:{" "}
+          <span className="text-foreground">{stats.topGenres.join(", ")}</span>
+        </p>
+      )}
 
       <Section id="favourites" title="Favourite four">
         {profile.favourites.length === 0 ? (

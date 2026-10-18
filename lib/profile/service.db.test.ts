@@ -37,6 +37,14 @@ describe.skipIf(!hasTestDatabase)("profiles", () => {
   const { pool, db } = openTestDatabase();
   const game = new Map<string, number>();
   const slugs = ["hades", "celeste", "tunic", "outer-wilds", "hollow-knight"];
+  const genreIds = ["Action", "Adventure", "Platform", "Roguelike"];
+  const genresBySlug: Record<string, string[]> = {
+    hades: ["Roguelike", "Action"],
+    celeste: ["Platform"],
+    tunic: ["Action", "Adventure"],
+    "outer-wilds": ["Adventure"],
+    "hollow-knight": ["Platform"],
+  };
 
   beforeAll(async () => {
     await resetTestDatabase(pool, db);
@@ -44,7 +52,7 @@ describe.skipIf(!hasTestDatabase)("profiles", () => {
 
   beforeEach(async () => {
     await pool.query(
-      "TRUNCATE users, games, platforms, activities RESTART IDENTITY CASCADE",
+      "TRUNCATE users, games, platforms, genres, activities RESTART IDENTITY CASCADE",
     );
     await db.insert(users).values([
       { id: "ana", email: "ana@example.com", username: "ana" },
@@ -60,6 +68,10 @@ describe.skipIf(!hasTestDatabase)("profiles", () => {
         releaseDate: null,
         summary: null,
         platforms: [],
+        genres: (genresBySlug[slug] ?? []).map((name) => ({
+          igdbId: genreIds.indexOf(name) + 1,
+          name,
+        })),
       })),
     );
     for (const row of await db.select().from(games)) game.set(row.slug, row.id);
@@ -184,6 +196,8 @@ describe.skipIf(!hasTestDatabase)("profiles", () => {
       reviews: 1,
       backlog: 1,
       lists: 1,
+      // Action covers two of her games; ties go alphabetically.
+      topGenres: ["Action", "Adventure", "Platform"],
     });
     expect(profile.recentLogs).toHaveLength(4);
     expect(profile.recentReviews.map((r) => r.body)).toEqual([

@@ -94,8 +94,8 @@ The browser tests are run separately and is not part of `pnpm check`.
   annotate and remove them at `/lists/<id>`. Public lists are readable signed
   out; private ones 404 for everyone but the owner. Writes lock the list row.
 - `lib/profile/` and `app/u/[username]/`: public profiles with the favourite
-  four, stats (games played, finished this year, hours, reviews), recent plays,
-  reviews, public lists and backlog. `/account` edits the username, display
+  four, stats (games played, finished this year, hours, reviews, top genres),
+  recent plays, reviews, public lists and backlog. `/account` edits the username, display
   name and bio; game pages add or remove a favourite (at most four).
 - `lib/social/`: one-way follows, player search (`/players`) and the home
   feed. Signed-in players see activity from the people they follow at `/`;

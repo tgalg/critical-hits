@@ -50,6 +50,13 @@
       "when": 1792363850608,
       "tag": "0006_posting_events",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792364041408,
+      "tag": "0007_genres",
+      "breakpoints": true
     }
   ]
 }

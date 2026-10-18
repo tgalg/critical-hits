@@ -13,6 +13,7 @@ export type IgdbGame = {
   first_release_date?: number;
   cover?: { id: number; image_id: string };
   platforms?: { id: number; name: string; abbreviation?: string }[];
+  genres?: { id: number; name: string }[];
 };
 
 // Main games, remakes and remasters (IGDB game_type ids 0, 8 and 9).
@@ -26,6 +27,7 @@ const fields = [
   "cover.image_id",
   "platforms.name",
   "platforms.abbreviation",
+  "genres.name",
 ].join(",");
 
 export function coverUrl(imageId: string) {
@@ -47,6 +49,10 @@ export function mapIgdbGame(game: IgdbGame): CatalogGame {
       igdbId: platform.id,
       name: platform.name,
       abbreviation: platform.abbreviation ?? null,
+    })),
+    genres: (game.genres ?? []).map((genre) => ({
+      igdbId: genre.id,
+      name: genre.name,
     })),
   };
 }
