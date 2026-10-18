@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { GameCover } from "@/components/catalog/game-cover";
 import { ReviewBody } from "@/components/logs/game-reviews";
+import { ReportButton } from "@/components/moderation/report-button";
 import { LikeButton } from "@/components/social/like-button";
 import { stars, statusLabels, type LogStatus } from "@/lib/logs/input";
 
@@ -135,7 +136,7 @@ export function Feed({
                   <ReviewBody body={entry.review.body} />
                 </div>
               ))}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-start gap-3">
               <time
                 dateTime={entry.createdAt.toISOString()}
                 className="text-xs text-muted-foreground"
@@ -150,6 +151,12 @@ export function Feed({
                   liked={likedReviews.has(entry.review.id)}
                   canLike={entry.actorId !== viewerId}
                   path="/"
+                  label={`${entry.actor}'s review`}
+                />
+              )}
+              {entry.review && entry.actorId !== viewerId && (
+                <ReportButton
+                  reviewId={entry.review.id}
                   label={`${entry.actor}'s review`}
                 />
               )}

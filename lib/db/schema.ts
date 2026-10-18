@@ -38,6 +38,13 @@ export const activityVerb = pgEnum("activity_verb", [
   "created_list",
 ]);
 
+export const reportReason = pgEnum("report_reason", [
+  "spam",
+  "abuse",
+  "spoilers",
+  "other",
+]);
+
 export const activityObject = pgEnum("activity_object", [
   "log",
   "review",
@@ -169,6 +176,31 @@ export const reviews = pgTable(
     createdAt: createdAt(),
   },
   (t) => [check("reviews_body_not_blank", sql`btrim(${t.body}) <> ''`)],
+);
+
+// A player's report of a review. Each player reports a review at most once;
+// a moderator resolves every open report on a review by hiding it or
+// dismissing them.
+export const reports = pgTable(
+  "reports",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    reviewId: integer("review_id")
+      .notNull()
+      .references(() => reviews.id, { onDelete: "cascade" }),
+    reporterId: text("reporter_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    reason: reportReason("reason").notNull(),
+    createdAt: createdAt(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  },
+  (t) => [
+    uniqueIndex("reports_review_reporter_idx").on(t.reviewId, t.reporterId),
+    index("reports_open_idx")
+      .on(t.createdAt)
+      .where(sql`${t.resolvedAt} IS NULL`),
+  ],
 );
 
 export const lists = pgTable(

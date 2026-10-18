@@ -6,6 +6,7 @@ import { SignOutButton } from "@/components/auth/sign-out-button";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { getAuth } from "@/lib/auth";
 import { getDatabase } from "@/lib/db";
+import { isAdmin } from "@/lib/moderation/admin";
 import { getAccount } from "@/lib/profile/service";
 
 export const metadata: Metadata = { title: "Your account · Critical Hits" };
@@ -32,6 +33,11 @@ export default async function AccountPage() {
         <Link href={`/u/${username}`} className="text-sm underline">
           View your profile
         </Link>
+        {isAdmin(user) && (
+          <Link href="/admin" className="ml-4 text-sm underline">
+            Moderation
+          </Link>
+        )}
       </header>
       <section aria-labelledby="profile" className="rounded-lg border p-6">
         <h2 id="profile" className="mb-4 font-medium">

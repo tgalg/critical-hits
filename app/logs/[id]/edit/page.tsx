@@ -35,6 +35,12 @@ export default async function EditLogPage(props: PageProps<"/logs/[id]/edit">) {
       <h1 className="text-3xl font-semibold tracking-tight">
         Edit your {game.title} log
       </h1>
+      {log.reviewHidden && (
+        <p className="rounded-md border p-3 text-sm text-muted-foreground">
+          A moderator hid your review of this play, so other players can&apos;t
+          see it. You can still edit or delete it here.
+        </p>
+      )}
       <LogForm
         logId={log.id}
         slug={game.slug}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ReportButton } from "@/components/moderation/report-button";
 import { LikeButton } from "@/components/social/like-button";
 import { stars } from "@/lib/logs/input";
 
@@ -74,15 +75,23 @@ export function GameReviews({
           ) : (
             <ReviewBody body={review.body} />
           )}
-          <LikeButton
-            type="review"
-            id={review.id}
-            count={review.likeCount}
-            liked={liked.has(review.id)}
-            canLike={viewerId !== null && viewerId !== review.authorId}
-            path={path}
-            label={`${review.author}'s review`}
-          />
+          <div className="flex flex-wrap items-start gap-4">
+            <LikeButton
+              type="review"
+              id={review.id}
+              count={review.likeCount}
+              liked={liked.has(review.id)}
+              canLike={viewerId !== null && viewerId !== review.authorId}
+              path={path}
+              label={`${review.author}'s review`}
+            />
+            {viewerId !== null && viewerId !== review.authorId && (
+              <ReportButton
+                reviewId={review.id}
+                label={`${review.author}'s review`}
+              />
+            )}
+          </div>
         </li>
       ))}
     </ul>
