@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cache } from "react";
 import { notFound } from "next/navigation";
 import {
   deleteListAction,
@@ -17,25 +18,25 @@ import { getCurrentUser } from "@/lib/session";
 const smallButton =
   "rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted";
 
-async function loadList(props: PageProps<"/lists/[id]">) {
-  const { id } = await props.params;
+// Metadata and the page share one load per request.
+const loadList = cache(async (id: string) => {
   const listId = Number(id);
   const user = await getCurrentUser();
   const list = Number.isSafeInteger(listId)
     ? await getList(getDatabase(), listId, user?.id ?? null)
     : null;
   return { list, user };
-}
+});
 
 export async function generateMetadata(
   props: PageProps<"/lists/[id]">,
 ): Promise<Metadata> {
-  const { list } = await loadList(props);
+  const { list } = await loadList((await props.params).id);
   return { title: list ? `${list.title} · Critical Hits` : "List not found" };
 }
 
 export default async function ListPage(props: PageProps<"/lists/[id]">) {
-  const { list, user } = await loadList(props);
+  const { list, user } = await loadList((await props.params).id);
   if (!list) notFound();
   const owner = user?.id === list.userId;
   const items = list.items;
@@ -56,7 +57,10 @@ export default async function ListPage(props: PageProps<"/lists/[id]">) {
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">{list.title}</h1>
         <p className="text-sm text-muted-foreground">
-          A list by {list.owner}
+          A list by{" "}
+          <Link href={`/u/${list.owner}`} className="underline">
+            {list.owner}
+          </Link>
           {!list.isPublic && " · Private"}
         </p>
         {list.description && (
