@@ -1,7 +1,7 @@
 import { and, asc, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { games, logs, reports, reviews, users } from "@/lib/db/schema";
-import { canPost, limitMessages } from "@/lib/limits";
+import { canPost, limitMessages, recordPost } from "@/lib/limits";
 import type { ReportReason } from "@/lib/moderation/reasons";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
@@ -48,7 +48,9 @@ export async function reportReview(
       .values({ reviewId, reporterId: userId, reason })
       .onConflictDoNothing()
       .returning({ id: reports.id });
-    return inserted.length > 0;
+    if (inserted.length === 0) return false;
+    await recordPost(tx, userId, "report");
+    return true;
   });
 }
 

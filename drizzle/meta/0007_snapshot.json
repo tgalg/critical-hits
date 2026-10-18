@@ -1949,7 +1949,8 @@
       "schema": "public",
       "values": [
         "review",
-        "list"
+        "list",
+        "report"
       ]
     },
     "public.report_reason": {
