@@ -69,8 +69,12 @@ describe.skipIf(!hasTestDatabase)("catalog queries", () => {
     expect(page).toMatchObject({
       title: "Hollow Knight",
       platforms: [
-        { name: "Nintendo Switch", abbreviation: null },
-        { name: "PC (Microsoft Windows)", abbreviation: "PC" },
+        { id: expect.any(Number), name: "Nintendo Switch", abbreviation: null },
+        {
+          id: expect.any(Number),
+          name: "PC (Microsoft Windows)",
+          abbreviation: "PC",
+        },
       ],
     });
     expect(await getGameBySlug(db, "missing")).toBeNull();
