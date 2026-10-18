@@ -9,7 +9,11 @@ type Field = "username" | "displayName" | "bio";
 const inputClass =
   "w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary aria-invalid:border-destructive";
 
-export function ProfileForm({ defaults }: { defaults: Record<Field, string> }) {
+export function ProfileForm({
+  defaults,
+}: {
+  defaults: Record<Field, string> & { backlogPublic: boolean };
+}) {
   const [state, action, pending] = useActionState<ProfileFormState, FormData>(
     saveProfile,
     { status: "idle", version: 0 },
@@ -64,6 +68,18 @@ export function ProfileForm({ defaults }: { defaults: Record<Field, string> }) {
           maxLength={profileLimits.bio}
         />,
       )}
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="backlogPublic"
+          defaultChecked={
+            state.values
+              ? state.values.backlogPublic === "on"
+              : defaults.backlogPublic
+          }
+        />
+        Show my backlog on my profile
+      </label>
       {state.message && (
         <p
           role={state.status === "error" ? "alert" : "status"}

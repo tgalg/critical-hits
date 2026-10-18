@@ -19,6 +19,8 @@ type Review = {
   containsSpoilers: boolean;
   likeCount: number;
   authorId: string;
+  // Set where reviews of several games are listed together.
+  game?: { slug: string; title: string };
 };
 
 // Plain text with the writer's line breaks; no HTML or Markdown.
@@ -51,6 +53,14 @@ export function GameReviews({
             >
               {review.author}
             </Link>
+            {review.game && (
+              <Link
+                href={`/games/${review.game.slug}`}
+                className="text-foreground hover:underline"
+              >
+                {review.game.title}
+              </Link>
+            )}
             {review.rating !== null && (
               <span
                 className="text-primary"

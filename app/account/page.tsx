@@ -48,6 +48,7 @@ export default async function AccountPage() {
             username,
             displayName: account.displayName ?? "",
             bio: account.bio ?? "",
+            backlogPublic: account.backlogPublic,
           }}
         />
       </section>

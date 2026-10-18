@@ -37,6 +37,10 @@ test("follows a player found by search, sees and likes their review", async ({
   await signUp(reader, `reader${stamp}`);
   await reader.goto("/");
   await expect(reader.getByText("Nothing here yet.")).toBeVisible();
+  // An empty feed suggests reviews instead, such as the one just written.
+  await expect(
+    reader.getByRole("region", { name: "Popular reviews" }),
+  ).toBeVisible();
   await reader.getByLabel("Find players").fill(writerName);
   await reader.getByRole("button", { name: "Search" }).click();
   await reader.getByRole("link", { name: writerName }).first().click();

@@ -55,6 +55,24 @@ test("edits a profile, picks a favourite and shows it publicly", async ({
   await expect(visitor.getByRole("link", { name: "Edit profile" })).toHaveCount(
     0,
   );
+  await expect(visitor.getByRole("region", { name: /^Backlog/ })).toBeVisible();
+
+  // A private backlog shows only to its owner.
+  await page.goto("/account");
+  await page.getByLabel("Show my backlog on my profile").uncheck();
+  await page.getByRole("button", { name: "Save profile" }).click();
+  await expect(page.getByRole("status")).toHaveText("Saved.");
+  await expect(
+    page.getByLabel("Show my backlog on my profile"),
+  ).not.toBeChecked();
+  await visitor.reload();
+  await expect(visitor.getByRole("region", { name: /^Backlog/ })).toHaveCount(
+    0,
+  );
+  await page.goto(`/u/${renamed.toLowerCase()}`);
+  await expect(
+    page.getByRole("heading", { name: "Backlog (0) · only you can see this" }),
+  ).toBeVisible();
   await visitor.close();
 });
 

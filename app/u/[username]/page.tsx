@@ -17,14 +17,18 @@ import { getLikedIds } from "@/lib/social/likes";
 
 // Metadata and the page share one load per request. Next.js has already
 // decoded the username segment.
-const loadProfile = cache((username: string) =>
-  getProfile(getDatabase(), username, new Date().getUTCFullYear()),
+const loadProfile = cache((username: string, viewerId: string | null) =>
+  getProfile(getDatabase(), username, new Date().getUTCFullYear(), viewerId),
 );
 
 export async function generateMetadata(
   props: PageProps<"/u/[username]">,
 ): Promise<Metadata> {
-  const profile = await loadProfile((await props.params).username);
+  const viewer = await getCurrentUser();
+  const profile = await loadProfile(
+    (await props.params).username,
+    viewer?.id ?? null,
+  );
   return {
     title: profile
       ? `${profile.user.displayName || profile.user.username} · Critical Hits`
@@ -55,9 +59,12 @@ function Section({
 }
 
 export default async function ProfilePage(props: PageProps<"/u/[username]">) {
-  const profile = await loadProfile((await props.params).username);
-  if (!profile) notFound();
   const viewer = await getCurrentUser();
+  const profile = await loadProfile(
+    (await props.params).username,
+    viewer?.id ?? null,
+  );
+  if (!profile) notFound();
   const own = viewer?.id === profile.user.id;
   const [followState, likedReviews] = await Promise.all([
     getFollowState(getDatabase(), profile.user.id, viewer?.id ?? null),
@@ -250,28 +257,33 @@ export default async function ProfilePage(props: PageProps<"/u/[username]">) {
         )}
       </Section>
 
-      <Section id="backlog" title={`Backlog (${stats.backlog})`}>
-        {profile.backlog.length === 0 ? (
-          <p className="text-muted-foreground">Nothing queued up.</p>
-        ) : (
-          <ol className="grid grid-cols-5 gap-3">
-            {profile.backlog.map((entry) => (
-              <li key={entry.gameId}>
-                <Link
-                  href={`/games/${entry.game.slug}`}
-                  title={entry.game.title}
-                >
-                  <GameCover
-                    src={entry.game.coverUrl}
+      {profile.backlog && (
+        <Section
+          id="backlog"
+          title={`Backlog (${stats.backlog})${profile.user.backlogPublic ? "" : " · only you can see this"}`}
+        >
+          {profile.backlog.length === 0 ? (
+            <p className="text-muted-foreground">Nothing queued up.</p>
+          ) : (
+            <ol className="grid grid-cols-5 gap-3">
+              {profile.backlog.map((entry) => (
+                <li key={entry.gameId}>
+                  <Link
+                    href={`/games/${entry.game.slug}`}
                     title={entry.game.title}
-                  />
-                  <span className="sr-only">{entry.game.title}</span>
-                </Link>
-              </li>
-            ))}
-          </ol>
-        )}
-      </Section>
+                  >
+                    <GameCover
+                      src={entry.game.coverUrl}
+                      title={entry.game.title}
+                    />
+                    <span className="sr-only">{entry.game.title}</span>
+                  </Link>
+                </li>
+              ))}
+            </ol>
+          )}
+        </Section>
+      )}
     </main>
   );
 }

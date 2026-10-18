@@ -36,6 +36,20 @@
       "when": 1792361874899,
       "tag": "0004_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792362114853,
+      "tag": "0005_backlog_privacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792363850608,
+      "tag": "0006_posting_events",
+      "breakpoints": true
     }
   ]
 }

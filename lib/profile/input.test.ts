@@ -15,7 +15,12 @@ describe("parseProfileForm", () => {
       ),
     ).toEqual({
       ok: true,
-      value: { username: "Tom.Berry", displayName: null, bio: "Hi\nthere" },
+      value: {
+        username: "Tom.Berry",
+        displayName: null,
+        bio: "Hi\nthere",
+        backlogPublic: false,
+      },
     });
   });
 

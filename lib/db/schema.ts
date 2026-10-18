@@ -65,6 +65,8 @@ export const users = pgTable(
     displayName: text("display_name"),
     avatarUrl: text("avatar_url"),
     bio: text("bio"),
+    // Whether other players see this player's backlog on their profile.
+    backlogPublic: boolean("backlog_public").notNull().default(true),
     favouriteGameIds: integer("favourite_game_ids")
       .array()
       .notNull()
@@ -294,6 +296,23 @@ export const likes = pgTable(
     primaryKey({ columns: [t.userId, t.targetType, t.targetId] }),
     index("likes_target_idx").on(t.targetType, t.targetId),
   ],
+);
+
+export const postKind = pgEnum("post_kind", ["review", "list", "report"]);
+
+// One row per review, list or report a player creates, kept when the post (or
+// the reported review) is deleted, so posting limits (lib/limits.ts) can't be dodged by deleting and reposting.
+export const postingEvents = pgTable(
+  "posting_events",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: postKind("kind").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("posting_events_user_idx").on(t.userId, t.kind, t.createdAt)],
 );
 
 // Written on each log, review and list; the feed reads it for followed users (fan-out on read).

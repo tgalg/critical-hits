@@ -47,6 +47,7 @@ export async function updateProfile(
         displayUsername: input.username,
         displayName: input.displayName,
         bio: input.bio,
+        backlogPublic: input.backlogPublic,
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId));
@@ -105,8 +106,14 @@ export async function getFavouriteIds(db: Database, userId: string) {
 export const profileRecentLimit = 10;
 
 // Everything the public profile shows, or null for an unknown username.
-// Private lists are left out; the rest of a player's activity is public.
-export async function getProfile(db: Database, username: string, year: number) {
+// Private lists are left out, and a private backlog (null here) is shown only
+// to its owner; the rest of a player's activity is public.
+export async function getProfile(
+  db: Database,
+  username: string,
+  year: number,
+  viewerId: string | null = null,
+) {
   const [user] = await db
     .select({
       id: users.id,
@@ -114,10 +121,12 @@ export async function getProfile(db: Database, username: string, year: number) {
       displayName: users.displayName,
       bio: users.bio,
       favouriteGameIds: users.favouriteGameIds,
+      backlogPublic: users.backlogPublic,
     })
     .from(users)
     .where(eq(sql`lower(${users.username})`, username.toLowerCase()));
   if (!user) return null;
+  const showBacklog = user.backlogPublic || viewerId === user.id;
 
   const mine = eq(logs.userId, user.id);
   const finishedThisYear = sql<number>`count(*) filter (where ${logs.status} = 'finished' and extract(year from coalesce(${logs.finishedOn}, (${logs.createdAt} AT TIME ZONE 'UTC')::date)) = ${year})::int`;
@@ -204,24 +213,27 @@ export async function getProfile(db: Database, username: string, year: number) {
       .where(and(eq(lists.userId, user.id), eq(lists.isPublic, true)))
       .groupBy(lists.id)
       .orderBy(desc(lists.createdAt), desc(lists.id)),
-    db
-      .select({
-        gameId: backlogItems.gameId,
-        game: {
-          slug: games.slug,
-          title: games.title,
-          coverUrl: games.coverUrl,
-        },
-      })
-      .from(backlogItems)
-      .innerJoin(games, eq(games.id, backlogItems.gameId))
-      .where(eq(backlogItems.userId, user.id))
-      .orderBy(asc(backlogItems.position))
-      .limit(profileRecentLimit),
-    db
-      .select({ total: count() })
-      .from(backlogItems)
-      .where(eq(backlogItems.userId, user.id)),
+    showBacklog &&
+      db
+        .select({
+          gameId: backlogItems.gameId,
+          game: {
+            slug: games.slug,
+            title: games.title,
+            coverUrl: games.coverUrl,
+          },
+        })
+        .from(backlogItems)
+        .innerJoin(games, eq(games.id, backlogItems.gameId))
+        .where(eq(backlogItems.userId, user.id))
+        .orderBy(asc(backlogItems.position))
+        .limit(profileRecentLimit),
+    showBacklog
+      ? db
+          .select({ total: count() })
+          .from(backlogItems)
+          .where(eq(backlogItems.userId, user.id))
+      : [null],
   ]);
 
   // Keep the order the player picked their favourites in.
@@ -232,14 +244,18 @@ export async function getProfile(db: Database, username: string, year: number) {
   return {
     user,
     favourites,
-    stats: { ...stats, backlog: backlogTotal.total, lists: publicLists.length },
+    stats: {
+      ...stats,
+      backlog: backlogTotal?.total ?? null,
+      lists: publicLists.length,
+    },
     recentLogs,
     recentReviews: recentReviews.map((review) => ({
       ...review,
       author: user.username,
     })),
     lists: publicLists,
-    backlog,
+    backlog: backlog || null,
   };
 }
 
@@ -250,6 +266,7 @@ export async function getAccount(db: Database, userId: string) {
       username: sql<string>`coalesce(${users.displayUsername}, ${users.username})`,
       displayName: users.displayName,
       bio: users.bio,
+      backlogPublic: users.backlogPublic,
     })
     .from(users)
     .where(eq(users.id, userId));
