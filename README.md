@@ -75,6 +75,9 @@ The browser smoke test is run separately and is not part of `pnpm check`.
 - `drizzle/`: generated migrations, starting with `0000_init.sql` (which also
   enables `pg_trgm`). Run `pnpm db:migrate` after pulling schema changes, and
   review generated SQL before applying it.
+- `scripts/vercel-build.mjs`: Vercel's build command. Production deploys run
+  `drizzle-kit migrate` (using `DATABASE_URL_UNPOOLED` when Neon provides it)
+  before `next build`; preview deploys only build.
 - `harness/`: shared development workflow; see [its README](harness/README.md).
 
 Use strict TypeScript, ESLint's Next.js presets, and Prettier. Next.js generates

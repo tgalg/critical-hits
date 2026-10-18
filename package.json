@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "node scripts/vercel-build.mjs",
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
