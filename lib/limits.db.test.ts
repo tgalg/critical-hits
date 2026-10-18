@@ -187,4 +187,24 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
     // Reporting the same review again still just says it's already reported.
     expect(await reportReview(db, "new", reviewIds[0], "abuse")).toBe(false);
   });
+
+  it("treats a doubled report on the last free slot as a repeat", async () => {
+    const reviewIds: number[] = [];
+    for (let i = 0; i < hourlyLimits.report.newAccount; i++) {
+      const logId = await createLog(db, "old", hades, reviewed(`R${i}`));
+      const [row] = await db
+        .select({ id: reviews.id })
+        .from(reviews)
+        .where(eq(reviews.logId, logId));
+      reviewIds.push(row.id);
+    }
+    for (const id of reviewIds.slice(0, -1)) {
+      await reportReview(db, "new", id, "spam");
+    }
+    const last = reviewIds.at(-1)!;
+    const results = await Promise.all(
+      Array.from({ length: 5 }, () => reportReview(db, "new", last, "spam")),
+    );
+    expect(results.filter(Boolean)).toHaveLength(1);
+  });
 });
