@@ -29,21 +29,22 @@ credentials are for local development only.
 Run all commands from the repository root. Prefix `pnpm` with `corepack` if there
 is no pnpm shim on PATH.
 
-| Command                             | Purpose                                                                   |
-| ----------------------------------- | ------------------------------------------------------------------------- |
-| `pnpm dev`                          | Start the development server                                              |
-| `pnpm build`                        | Create the production build                                               |
-| `pnpm start`                        | Serve an existing production build                                        |
-| `pnpm test`                         | Run the Vitest unit suite once                                            |
-| `pnpm vitest run lib/utils.test.ts` | Run the sample unit test directly                                         |
-| `pnpm test:watch`                   | Watch unit tests                                                          |
-| `pnpm e2e`                          | Run the Chromium home-page smoke test; starts its own server on port 3100 |
-| `pnpm typecheck`                    | Generate Next.js types and run strict TypeScript checks                   |
-| `pnpm lint`                         | Check ESLint rules and Prettier formatting                                |
-| `pnpm format`                       | Format application and root configuration files                           |
-| `pnpm check`                        | Run lint, typecheck, unit tests, and build                                |
-| `pnpm db:generate`                  | Generate a Drizzle migration from the schema using `.env`                 |
-| `pnpm db:migrate`                   | Apply generated migrations to `DATABASE_URL`                              |
+| Command                             | Purpose                                                                                                                                       |
+| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev`                          | Start the development server                                                                                                                  |
+| `pnpm build`                        | Create the production build                                                                                                                   |
+| `pnpm start`                        | Serve an existing production build                                                                                                            |
+| `pnpm test`                         | Run the Vitest unit suite once                                                                                                                |
+| `pnpm vitest run lib/utils.test.ts` | Run the sample unit test directly                                                                                                             |
+| `pnpm test:watch`                   | Watch unit tests                                                                                                                              |
+| `pnpm e2e`                          | Run the Chromium browser tests (auth and catalog need a migrated `DATABASE_URL`); builds and starts its own server on port 3100               |
+| `pnpm typecheck`                    | Generate Next.js types and run strict TypeScript checks                                                                                       |
+| `pnpm lint`                         | Check ESLint rules and Prettier formatting                                                                                                    |
+| `pnpm format`                       | Format application and root configuration files                                                                                               |
+| `pnpm check`                        | Run lint, typecheck, unit tests, and build                                                                                                    |
+| `pnpm db:generate`                  | Generate a Drizzle migration from the schema using `.env`                                                                                     |
+| `pnpm db:migrate`                   | Apply generated migrations to `DATABASE_URL`                                                                                                  |
+| `pnpm catalog:seed`                 | Full IGDB catalog sync into `DATABASE_URL`; needs `TWITCH_CLIENT_ID` and `TWITCH_CLIENT_SECRET` in `.env`; pass an IGDB id to resume after it |
 
 Install the Playwright browser once before the smoke test:
 
@@ -53,7 +54,7 @@ corepack pnpm e2e
 ```
 
 GitHub Actions runs lint, typecheck, unit tests, and build with a frozen lockfile.
-The browser smoke test is run separately and is not part of `pnpm check`.
+The browser tests are run separately and is not part of `pnpm check`.
 
 ## Structure and conventions
 
@@ -63,13 +64,24 @@ The browser smoke test is run separately and is not part of `pnpm check`.
 - `lib/utils.ts`: shared `cn` class utility; `lib/utils.test.ts` is its sample test.
 - `lib/db/`: lazy, server-only Drizzle connection and the MVP schema (`schema.ts`),
   with database tests in `schema.db.test.ts`.
+- `app/games/`: game search (`/games?q=`, pg_trgm fuzzy match plus substring)
+  and game pages (`/games/<slug>`); queries live in `lib/catalog/queries.ts`.
+- `lib/catalog/` and `lib/igdb/`: the game catalog. `CatalogSource` is the
+  interface a game-data source implements; `lib/igdb/` implements it for IGDB
+  (Twitch client-credentials token, 4 requests per second), and
+  `lib/catalog/sync.ts` upserts games, platforms and their links by IGDB id.
+  Vercel Cron calls `/api/cron/igdb-sync` nightly (`vercel.json`) with
+  `Authorization: Bearer $CRON_SECRET`. Each run syncs games changed in the
+  last two days, then continues the full backfill from the cursor saved in
+  `sync_cursors`, so a new database fills itself over a few runs (or faster by
+  pressing Run on the cron job in the Vercel dashboard).
 - `lib/auth.ts`: Better Auth server config mapped onto the `users`, `sessions`,
   `accounts` and `verifications` tables; `lib/auth-client.ts` is the browser
   client. The API lives at `app/api/auth/[...all]`, with pages at `/sign-up`,
   `/sign-in` and `/account`. Set `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` in
   `.env`; Discord sign-in turns on only when `DISCORD_CLIENT_ID` and
   `DISCORD_CLIENT_SECRET` are both set.
-- `e2e/`: Playwright smoke and auth tests (the auth test needs a migrated
+- `e2e/`: Playwright smoke, auth and catalog tests (auth and catalog need a migrated
   `DATABASE_URL`), isolated from Vitest's `*.test.ts` discovery.
 - `drizzle.config.ts`: PostgreSQL migration configuration; requires `DATABASE_URL`.
 - `drizzle/`: generated migrations, starting with `0000_init.sql` (which also

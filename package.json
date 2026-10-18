@@ -20,7 +20,8 @@
     "format": "prettier --write .",
     "check": "npm run lint && npm run typecheck && npm run test && npm run build",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "catalog:seed": "esbuild scripts/catalog-seed.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outfile=.next/catalog-seed.mjs && node --env-file=.env .next/catalog-seed.mjs"
   },
   "dependencies": {
     "better-auth": "1.7.10",
