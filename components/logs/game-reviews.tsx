@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { stars } from "@/lib/logs/input";
 
 const dateFormat = new Intl.DateTimeFormat("en", {
@@ -17,7 +18,7 @@ type Review = {
 };
 
 // Plain text with the writer's line breaks; no HTML or Markdown.
-function ReviewBody({ body }: { body: string }) {
+export function ReviewBody({ body }: { body: string }) {
   return <p className="leading-relaxed whitespace-pre-line">{body}</p>;
 }
 
@@ -30,7 +31,12 @@ export function GameReviews({ reviews }: { reviews: Review[] }) {
       {reviews.map((review) => (
         <li key={review.id} className="space-y-2 p-4">
           <p className="flex flex-wrap items-center gap-x-3 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{review.author}</span>
+            <Link
+              href={`/u/${review.author}`}
+              className="font-medium text-foreground hover:underline"
+            >
+              {review.author}
+            </Link>
             {review.rating !== null && (
               <span
                 className="text-primary"

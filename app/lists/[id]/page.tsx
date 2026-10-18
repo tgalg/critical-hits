@@ -56,7 +56,10 @@ export default async function ListPage(props: PageProps<"/lists/[id]">) {
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold tracking-tight">{list.title}</h1>
         <p className="text-sm text-muted-foreground">
-          A list by {list.owner}
+          A list by{" "}
+          <Link href={`/u/${list.owner}`} className="underline">
+            {list.owner}
+          </Link>
           {!list.isPublic && " · Private"}
         </p>
         {list.description && (

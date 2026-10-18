@@ -93,13 +93,17 @@ The browser tests are run separately and is not part of `pnpm check`.
   public or private lists at `/lists`, add games from game pages, and reorder,
   annotate and remove them at `/lists/<id>`. Public lists are readable signed
   out; private ones 404 for everyone but the owner. Writes lock the list row.
+- `lib/profile/` and `app/u/[username]/`: public profiles with the favourite
+  four, stats (games played, finished this year, hours, reviews), recent plays,
+  reviews, public lists and backlog. `/account` edits the username, display
+  name and bio; game pages add or remove a favourite (at most four).
 - `lib/auth.ts`: Better Auth server config mapped onto the `users`, `sessions`,
   `accounts` and `verifications` tables; `lib/auth-client.ts` is the browser
   client. The API lives at `app/api/auth/[...all]`, with pages at `/sign-up`,
   `/sign-in` and `/account`. Set `BETTER_AUTH_SECRET` and `BETTER_AUTH_URL` in
   `.env`; Discord sign-in turns on only when `DISCORD_CLIENT_ID` and
   `DISCORD_CLIENT_SECRET` are both set.
-- `e2e/`: Playwright smoke, auth, catalog, logging, backlog and lists tests (all but smoke need a migrated
+- `e2e/`: Playwright smoke, auth, catalog, logging, backlog, lists and profile tests (all but smoke need a migrated
   `DATABASE_URL`), isolated from Vitest's `*.test.ts` discovery.
 - `drizzle.config.ts`: PostgreSQL migration configuration; requires `DATABASE_URL`.
 - `drizzle/`: generated migrations, starting with `0000_init.sql` (which also
