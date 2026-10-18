@@ -31,14 +31,15 @@ const recent = {
     sql`SELECT count(*) FROM reports WHERE reporter_id = ${userId} AND created_at > now() - interval '1 hour'`,
 };
 
-// Whether the player may post one more of this kind now. Concurrent posts
-// can each pass the check, so the limit is soft by at most a few posts.
-export async function canPost(
-  db: Database | Transaction,
-  userId: string,
-  kind: PostKind,
-) {
-  const { rows } = await db.execute<{ is_new: boolean; posted: number }>(sql`
+// Whether the player may post one more of this kind now. Must run inside the
+// transaction that records the post: it takes a per-player lock held until
+// that transaction ends, so concurrent posts are counted one after another
+// instead of all passing the same check.
+export async function canPost(tx: Transaction, userId: string, kind: PostKind) {
+  await tx.execute(
+    sql`SELECT pg_advisory_xact_lock(hashtext(${`post-limit:${userId}`}))`,
+  );
+  const { rows } = await tx.execute<{ is_new: boolean; posted: number }>(sql`
     SELECT created_at > now() - interval '1 day' AS is_new,
            (${recent[kind](userId)})::int AS posted
     FROM users WHERE id = ${userId}`);

@@ -91,23 +91,58 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
     );
   });
 
+  const mayReview = () => db.transaction((tx) => canPost(tx, "old", "review"));
+
   it("gives older accounts the higher limit and forgets old posts", async () => {
     for (let i = 0; i < hourlyLimits.review.newAccount + 1; i++) {
       await createLog(db, "old", hades, reviewed(`Review ${i}`));
     }
-    expect(await canPost(db, "old", "review")).toBe(true);
+    expect(await mayReview()).toBe(true);
     await db.insert(postingEvents).values(
       Array.from({ length: hourlyLimits.review.account }, () => ({
         userId: "old",
         kind: "review" as const,
       })),
     );
-    expect(await canPost(db, "old", "review")).toBe(false);
+    expect(await mayReview()).toBe(false);
     await db
       .update(postingEvents)
       .set({ createdAt: sql`now() - interval '2 hours'` })
       .where(eq(postingEvents.userId, "old"));
-    expect(await canPost(db, "old", "review")).toBe(true);
+    expect(await mayReview()).toBe(true);
+  });
+
+  it("holds the limit when posts arrive at once", async () => {
+    const results = await Promise.allSettled(
+      Array.from({ length: 10 }, (_, i) =>
+        createList(db, "new", list(`Burst ${i}`)),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(
+      hourlyLimits.list.newAccount,
+    );
+  });
+
+  it("holds the review limit when reviews arrive at once", async () => {
+    // Separate games, so the game lock doesn't line the writes up by itself.
+    const burst = await db
+      .insert(games)
+      .values(
+        Array.from({ length: 10 }, (_, i) => ({
+          igdbId: 100 + i,
+          slug: `burst-${i}`,
+          title: `Burst ${i}`,
+        })),
+      )
+      .returning({ id: games.id });
+    const results = await Promise.allSettled(
+      burst.map(({ id }, i) =>
+        createLog(db, "new", id, reviewed(`Burst ${i}`)),
+      ),
+    );
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(
+      hourlyLimits.review.newAccount,
+    );
   });
 
   it("still counts reviews and lists that were deleted", async () => {
