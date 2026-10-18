@@ -50,11 +50,15 @@ describe.skipIf(!hasTestDatabase)("likes", () => {
     await pool.query(
       "TRUNCATE users, games, platforms, activities, likes RESTART IDENTITY CASCADE",
     );
-    await db
-      .insert(users)
-      .values(
-        players.map((id) => ({ id, email: `${id}@example.com`, username: id })),
-      );
+    await db.insert(users).values(
+      players.map((id) => ({
+        id,
+        email: `${id}@example.com`,
+        username: id,
+        // Older accounts, so the race test stays under the posting limits.
+        createdAt: sql`now() - interval '2 days'`,
+      })),
+    );
     await upsertCatalogGames(db, [
       {
         igdbId: 1,

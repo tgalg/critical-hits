@@ -1,11 +1,17 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { upsertCatalogGames } from "@/lib/catalog/sync";
-import { activities, games, reviews, users } from "@/lib/db/schema";
+import {
+  activities,
+  games,
+  postingEvents,
+  reviews,
+  users,
+} from "@/lib/db/schema";
 import { canPost, hourlyLimits } from "@/lib/limits";
-import { createList, ListError } from "@/lib/lists/service";
+import { createList, deleteList, ListError } from "@/lib/lists/service";
 import type { LogInput } from "@/lib/logs/input";
-import { createLog, LogError } from "@/lib/logs/service";
+import { createLog, deleteLog, LogError } from "@/lib/logs/service";
 import { ModerationError, reportReview } from "@/lib/moderation/service";
 import {
   hasTestDatabase,
@@ -90,20 +96,34 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
       await createLog(db, "old", hades, reviewed(`Review ${i}`));
     }
     expect(await canPost(db, "old", "review")).toBe(true);
-    await db.insert(activities).values(
-      Array.from({ length: hourlyLimits.review.account }, (_, i) => ({
-        actorId: "old",
-        verb: "reviewed" as const,
-        objectType: "review" as const,
-        objectId: 100_000 + i,
+    await db.insert(postingEvents).values(
+      Array.from({ length: hourlyLimits.review.account }, () => ({
+        userId: "old",
+        kind: "review" as const,
       })),
     );
     expect(await canPost(db, "old", "review")).toBe(false);
     await db
-      .update(activities)
+      .update(postingEvents)
       .set({ createdAt: sql`now() - interval '2 hours'` })
-      .where(eq(activities.actorId, "old"));
+      .where(eq(postingEvents.userId, "old"));
     expect(await canPost(db, "old", "review")).toBe(true);
+  });
+
+  it("still counts reviews and lists that were deleted", async () => {
+    for (let i = 0; i < hourlyLimits.review.newAccount; i++) {
+      const logId = await createLog(db, "new", hades, reviewed(`Review ${i}`));
+      await deleteLog(db, "new", logId);
+    }
+    await expect(
+      createLog(db, "new", hades, reviewed("Again")),
+    ).rejects.toThrow(LogError);
+    for (let i = 0; i < hourlyLimits.list.newAccount; i++) {
+      await deleteList(db, "new", await createList(db, "new", list(`L${i}`)));
+    }
+    await expect(createList(db, "new", list("Again"))).rejects.toThrow(
+      ListError,
+    );
   });
 
   it("caps new accounts' lists and reports", async () => {
@@ -129,5 +149,7 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
     await expect(
       reportReview(db, "new", reviewIds.at(-1)!, "spam"),
     ).rejects.toThrow(ModerationError);
+    // Reporting the same review again still just says it's already reported.
+    expect(await reportReview(db, "new", reviewIds[0], "abuse")).toBe(false);
   });
 });

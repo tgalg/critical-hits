@@ -298,6 +298,23 @@ export const likes = pgTable(
   ],
 );
 
+export const postKind = pgEnum("post_kind", ["review", "list"]);
+
+// One row per review or list a player creates, kept when the post is deleted,
+// so posting limits (lib/limits.ts) can't be dodged by deleting and reposting.
+export const postingEvents = pgTable(
+  "posting_events",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: postKind("kind").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index("posting_events_user_idx").on(t.userId, t.kind, t.createdAt)],
+);
+
 // Written on each log, review and list; the feed reads it for followed users (fan-out on read).
 export const activities = pgTable(
   "activities",

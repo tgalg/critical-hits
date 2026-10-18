@@ -31,6 +31,14 @@ export async function reportReview(
     if (review.author_id === userId) {
       throw new ModerationError("You can't report your own review.");
     }
+    // A repeat report changes nothing, so it never counts against the limit.
+    const [existing] = await tx
+      .select({ id: reports.id })
+      .from(reports)
+      .where(
+        and(eq(reports.reviewId, reviewId), eq(reports.reporterId, userId)),
+      );
+    if (existing) return false;
     if (!(await canPost(tx, userId, "report"))) {
       throw new ModerationError(limitMessages.report);
     }

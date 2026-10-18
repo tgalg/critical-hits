@@ -9,7 +9,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import type { ListInput } from "@/lib/lists/input";
-import { canPost, limitMessages } from "@/lib/limits";
+import { canPost, limitMessages, recordPost } from "@/lib/limits";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 type Database = NodePgDatabase<any>;
@@ -37,6 +37,7 @@ export async function createList(
     if (!(await canPost(tx, userId, "list"))) {
       throw new ListError(limitMessages.list);
     }
+    await recordPost(tx, userId, "list");
     const [list] = await tx
       .insert(lists)
       .values({ ...input, userId })

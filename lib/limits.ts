@@ -1,5 +1,6 @@
-import { sql } from "drizzle-orm";
+import { and, eq, lt, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import { postingEvents } from "@/lib/db/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 type Database = NodePgDatabase<any>;
@@ -19,11 +20,13 @@ export const hourlyLimits: Record<
   report: { newAccount: 10, account: 30 },
 };
 
+// Reviews and lists are counted from posting_events, which deleting a post
+// leaves alone; reports are never deleted by their reporter.
 const recent = {
   review: (userId: string) =>
-    sql`SELECT count(*) FROM activities WHERE actor_id = ${userId} AND verb = 'reviewed' AND created_at > now() - interval '1 hour'`,
+    sql`SELECT count(*) FROM posting_events WHERE user_id = ${userId} AND kind = 'review' AND created_at > now() - interval '1 hour'`,
   list: (userId: string) =>
-    sql`SELECT count(*) FROM activities WHERE actor_id = ${userId} AND verb = 'created_list' AND created_at > now() - interval '1 hour'`,
+    sql`SELECT count(*) FROM posting_events WHERE user_id = ${userId} AND kind = 'list' AND created_at > now() - interval '1 hour'`,
   report: (userId: string) =>
     sql`SELECT count(*) FROM reports WHERE reporter_id = ${userId} AND created_at > now() - interval '1 hour'`,
 };
@@ -43,6 +46,24 @@ export async function canPost(
   if (!row) return false;
   const limit = hourlyLimits[kind];
   return row.posted < (row.is_new ? limit.newAccount : limit.account);
+}
+
+// Records a new review or list against the player's limit, dropping their
+// records too old to count.
+export async function recordPost(
+  db: Database | Transaction,
+  userId: string,
+  kind: "review" | "list",
+) {
+  await db
+    .delete(postingEvents)
+    .where(
+      and(
+        eq(postingEvents.userId, userId),
+        lt(postingEvents.createdAt, sql`now() - interval '1 hour'`),
+      ),
+    );
+  await db.insert(postingEvents).values({ userId, kind });
 }
 
 export const limitMessages: Record<PostKind, string> = {
