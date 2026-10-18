@@ -6,7 +6,14 @@ import {
   saveBackfillProgress,
   syncCatalog,
 } from "@/lib/catalog/sync";
-import { gamePlatforms, games, platforms, syncCursors } from "@/lib/db/schema";
+import {
+  gameGenres,
+  gamePlatforms,
+  games,
+  genres,
+  platforms,
+  syncCursors,
+} from "@/lib/db/schema";
 import { mapIgdbGame, type IgdbGame } from "@/lib/igdb/source";
 import fixture from "@/lib/igdb/__fixtures__/games.json";
 import {
@@ -34,7 +41,7 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
 
   beforeEach(async () => {
     await pool.query(
-      "TRUNCATE games, platforms, sync_cursors RESTART IDENTITY CASCADE",
+      "TRUNCATE games, platforms, genres, sync_cursors RESTART IDENTITY CASCADE",
     );
   });
 
@@ -46,13 +53,21 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
     games: await db.$count(games),
     platforms: await db.$count(platforms),
     links: await db.$count(gamePlatforms),
+    genres: await db.$count(genres),
+    genreLinks: await db.$count(gameGenres),
   });
 
   it("is idempotent across runs and pages", async () => {
     const result = await syncCatalog(db, fixedSource(catalog), { pageSize: 1 });
     expect(result).toEqual({ games: 2, cursor: 113112, done: true });
     const first = await counts();
-    expect(first).toEqual({ games: 2, platforms: 3, links: 4 });
+    expect(first).toEqual({
+      games: 2,
+      platforms: 3,
+      links: 4,
+      genres: 2,
+      genreLinks: 2,
+    });
 
     await syncCatalog(db, fixedSource(catalog));
     expect(await counts()).toEqual(first);
@@ -74,6 +89,21 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
     expect(
       await db.$count(gamePlatforms, eq(gamePlatforms.gameId, hades.id)),
     ).toBe(1);
+  });
+
+  it("replaces a game's genres when they change", async () => {
+    await syncCatalog(db, fixedSource(catalog));
+    const changed = catalog.map((game) =>
+      game.igdbId === 1942
+        ? { ...game, genres: [{ igdbId: 12, name: "RPG" }] }
+        : game,
+    );
+    await syncCatalog(db, fixedSource(changed));
+    const rows = await db
+      .select({ name: genres.name })
+      .from(gameGenres)
+      .innerJoin(genres, eq(genres.id, gameGenres.genreId));
+    expect(rows).toEqual([{ name: "RPG" }]);
   });
 
   it("stops after maxPages and resumes from the cursor", async () => {

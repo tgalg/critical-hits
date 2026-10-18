@@ -2,7 +2,9 @@ import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   backlogItems,
+  gameGenres,
   games,
+  genres,
   listItems,
   lists,
   logs,
@@ -104,6 +106,7 @@ export async function getFavouriteIds(db: Database, userId: string) {
 }
 
 export const profileRecentLimit = 10;
+export const topGenreCount = 3;
 
 // Everything the public profile shows, or null for an unknown username.
 // Private lists are left out, and a private backlog (null here) is shown only
@@ -138,6 +141,7 @@ export async function getProfile(
     publicLists,
     backlog,
     [backlogTotal],
+    topGenres,
   ] = await Promise.all([
     user.favouriteGameIds.length
       ? db
@@ -234,6 +238,16 @@ export async function getProfile(
           .from(backlogItems)
           .where(eq(backlogItems.userId, user.id))
       : [null],
+    // Genres of the most distinct games the player has logged.
+    db
+      .select({ name: genres.name })
+      .from(logs)
+      .innerJoin(gameGenres, eq(gameGenres.gameId, logs.gameId))
+      .innerJoin(genres, eq(genres.id, gameGenres.genreId))
+      .where(mine)
+      .groupBy(genres.id)
+      .orderBy(desc(sql`count(distinct ${logs.gameId})`), asc(genres.name))
+      .limit(topGenreCount),
   ]);
 
   // Keep the order the player picked their favourites in.
@@ -247,6 +261,7 @@ export async function getProfile(
     stats: {
       ...stats,
       backlog: backlogTotal?.total ?? null,
+      topGenres: topGenres.map((genre) => genre.name),
       lists: publicLists.length,
     },
     recentLogs,

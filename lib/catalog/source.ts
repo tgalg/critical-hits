@@ -6,6 +6,8 @@ export type CatalogPlatform = {
   abbreviation: string | null;
 };
 
+export type CatalogGenre = { igdbId: number; name: string };
+
 export type CatalogGame = {
   igdbId: number;
   slug: string;
@@ -14,6 +16,8 @@ export type CatalogGame = {
   releaseDate: string | null;
   summary: string | null;
   platforms: CatalogPlatform[];
+  // Left out by sources (and tests) that don't know genres.
+  genres?: CatalogGenre[];
 };
 
 export type CatalogPage = {

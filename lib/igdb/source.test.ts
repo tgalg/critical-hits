@@ -19,6 +19,10 @@ describe("mapIgdbGame", () => {
         { igdbId: 6, name: "PC (Microsoft Windows)", abbreviation: "PC" },
         { igdbId: 48, name: "PlayStation 4", abbreviation: "PS4" },
       ],
+      genres: [
+        { igdbId: 12, name: "Role-playing (RPG)" },
+        { igdbId: 31, name: "Adventure" },
+      ],
     });
   });
 
@@ -29,6 +33,7 @@ describe("mapIgdbGame", () => {
       releaseDate: null,
       summary: null,
       platforms: [],
+      genres: [],
     });
     expect(mapIgdbGame(games[1]).platforms[1].abbreviation).toBeNull();
   });
@@ -43,7 +48,7 @@ describe("gamesQuery", () => {
         updatedSince: new Date("2026-01-01T00:00:00Z"),
       }),
     ).toBe(
-      "fields name,slug,summary,first_release_date,cover.image_id,platforms.name,platforms.abbreviation; " +
+      "fields name,slug,summary,first_release_date,cover.image_id,platforms.name,platforms.abbreviation,genres.name; " +
         "where id > 10 & game_type = (0,8,9) & cover != null & updated_at >= 1767225600; sort id asc; limit 500;",
     );
   });

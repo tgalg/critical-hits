@@ -5,10 +5,31 @@
     "slug": "the-witcher-3-wild-hunt",
     "summary": "RPG and sequel to The Witcher 2.",
     "first_release_date": 1431993600,
-    "cover": { "id": 89386, "image_id": "coaarl" },
+    "cover": {
+      "id": 89386,
+      "image_id": "coaarl"
+    },
     "platforms": [
-      { "id": 6, "name": "PC (Microsoft Windows)", "abbreviation": "PC" },
-      { "id": 48, "name": "PlayStation 4", "abbreviation": "PS4" }
+      {
+        "id": 6,
+        "name": "PC (Microsoft Windows)",
+        "abbreviation": "PC"
+      },
+      {
+        "id": 48,
+        "name": "PlayStation 4",
+        "abbreviation": "PS4"
+      }
+    ],
+    "genres": [
+      {
+        "id": 12,
+        "name": "Role-playing (RPG)"
+      },
+      {
+        "id": 31,
+        "name": "Adventure"
+      }
     ]
   },
   {
@@ -16,10 +37,20 @@
     "name": "Hades",
     "slug": "hades--1",
     "first_release_date": 1600387200,
-    "cover": { "id": 85404, "image_id": "co39vc" },
+    "cover": {
+      "id": 85404,
+      "image_id": "co39vc"
+    },
     "platforms": [
-      { "id": 6, "name": "PC (Microsoft Windows)", "abbreviation": "PC" },
-      { "id": 130, "name": "Nintendo Switch" }
+      {
+        "id": 6,
+        "name": "PC (Microsoft Windows)",
+        "abbreviation": "PC"
+      },
+      {
+        "id": 130,
+        "name": "Nintendo Switch"
+      }
     ]
   }
 ]

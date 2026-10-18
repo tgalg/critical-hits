@@ -1,7 +1,14 @@
 import { eq, inArray, sql, type AnyColumn } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CatalogGame, CatalogSource } from "@/lib/catalog/source";
-import { gamePlatforms, games, platforms, syncCursors } from "@/lib/db/schema";
+import {
+  gameGenres,
+  gamePlatforms,
+  games,
+  genres,
+  platforms,
+  syncCursors,
+} from "@/lib/db/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 type Database = NodePgDatabase<any>;
@@ -17,8 +24,9 @@ const gameRow = (game: CatalogGame) => ({
 
 const excluded = (column: AnyColumn) => sql.raw(`excluded."${column.name}"`);
 
-// Inserts or updates games, their platforms and the links between them, keyed
-// on IGDB ids, so running it twice over the same data changes nothing.
+// Inserts or updates games, their platforms and genres and the links between
+// them, keyed on IGDB ids, so running it twice over the same data changes
+// nothing.
 export async function upsertCatalogGames(db: Database, batch: CatalogGame[]) {
   if (batch.length === 0) return;
   await db.transaction(async (tx) => {
@@ -70,6 +78,36 @@ export async function upsertCatalogGames(db: Database, batch: CatalogGame[]) {
     );
     if (links.length > 0) {
       await tx.insert(gamePlatforms).values(links).onConflictDoNothing();
+    }
+
+    const uniqueGenres = [
+      ...new Map(
+        batch.flatMap((game) => game.genres ?? []).map((g) => [g.igdbId, g]),
+      ).values(),
+    ];
+    const genreIds = new Map<number, number>();
+    if (uniqueGenres.length > 0) {
+      const rows = await tx
+        .insert(genres)
+        .values(uniqueGenres)
+        .onConflictDoUpdate({
+          target: genres.igdbId,
+          set: { name: excluded(genres.name) },
+        })
+        .returning({ id: genres.id, igdbId: genres.igdbId });
+      for (const row of rows) genreIds.set(row.igdbId, row.id);
+    }
+    await tx
+      .delete(gameGenres)
+      .where(inArray(gameGenres.gameId, [...gameIds.values()]));
+    const genreLinks = batch.flatMap((game) =>
+      (game.genres ?? []).map((genre) => ({
+        gameId: gameIds.get(game.igdbId)!,
+        genreId: genreIds.get(genre.igdbId)!,
+      })),
+    );
+    if (genreLinks.length > 0) {
+      await tx.insert(gameGenres).values(genreLinks).onConflictDoNothing();
     }
   });
 }
