@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { signUp } from "./sign-up";
 
 // Needs the app's database (DATABASE_URL, migrated) and BETTER_AUTH_URL matching the test server.
 test.skip(!process.env.DATABASE_URL, "needs a migrated database");
@@ -7,13 +8,7 @@ test("signs up, lands on the account page, signs out and back in", async ({
   page,
 }) => {
   const name = `player${Date.now()}`;
-  await page.goto("/sign-up");
-  await page.getByLabel("Email").fill(`${name}@example.com`);
-  await page.getByLabel("Username").fill(name);
-  await page.getByLabel("Password").fill("correct horse battery");
-  await page.getByRole("button", { name: "Sign up" }).click();
-
-  await expect(page).toHaveURL(/\/account$/);
+  await signUp(page, name);
   await expect(page.getByText(`@${name}`)).toBeVisible();
 
   await page.getByRole("button", { name: "Sign out" }).click();
