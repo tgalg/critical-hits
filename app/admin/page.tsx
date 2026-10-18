@@ -66,11 +66,14 @@ function ReviewHeading({
 }
 
 // Moderators only; everyone else gets the site's 404.
-export default async function AdminPage() {
+export default async function AdminPage(props: PageProps<"/admin">) {
   if (!(await getCurrentAdmin())) notFound();
+  const { hidden: pageParam } = await props.searchParams;
+  const requested = Number(pageParam);
+  const page = Number.isSafeInteger(requested) && requested > 1 ? requested : 1;
   const [open, hidden] = await Promise.all([
     getOpenReports(getDatabase()),
-    getHiddenReviews(getDatabase()),
+    getHiddenReviews(getDatabase(), page),
   ]);
 
   return (
@@ -120,11 +123,11 @@ export default async function AdminPage() {
         <h2 id="hidden" className="text-xl font-semibold">
           Hidden reviews
         </h2>
-        {hidden.length === 0 ? (
+        {hidden.reviews.length === 0 ? (
           <p className="text-muted-foreground">No hidden reviews.</p>
         ) : (
           <ul className="divide-y rounded-lg border">
-            {hidden.map((review) => (
+            {hidden.reviews.map((review) => (
               <li key={review.id} className="space-y-3 p-4">
                 <ReviewHeading review={review} />
                 <ReviewBody body={review.body} />
@@ -137,6 +140,28 @@ export default async function AdminPage() {
               </li>
             ))}
           </ul>
+        )}
+        {(page > 1 || hidden.hasMore) && (
+          <nav
+            aria-label="Hidden review pages"
+            className="flex justify-between text-sm"
+          >
+            {page > 1 ? (
+              <Link
+                href={page === 2 ? "/admin" : `/admin?hidden=${page - 1}`}
+                className="underline"
+              >
+                Newer
+              </Link>
+            ) : (
+              <span />
+            )}
+            {hidden.hasMore && (
+              <Link href={`/admin?hidden=${page + 1}`} className="underline">
+                Older
+              </Link>
+            )}
+          </nav>
         )}
       </section>
     </main>
