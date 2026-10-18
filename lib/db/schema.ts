@@ -339,3 +339,11 @@ export const verifications = pgTable(
   },
   (t) => [index("verifications_identifier_idx").on(t.identifier)],
 );
+
+// Resumable position of long-running sync jobs, such as the IGDB backfill.
+export const syncCursors = pgTable("sync_cursors", {
+  name: text("name").primaryKey(),
+  cursor: integer("cursor").notNull().default(0),
+  done: boolean("done").notNull().default(false),
+  updatedAt: updatedAt(),
+});

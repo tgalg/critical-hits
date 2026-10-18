@@ -1,7 +1,7 @@
-import { inArray, sql, type AnyColumn } from "drizzle-orm";
+import { eq, inArray, sql, type AnyColumn } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { CatalogGame, CatalogSource } from "@/lib/catalog/source";
-import { gamePlatforms, games, platforms } from "@/lib/db/schema";
+import { gamePlatforms, games, platforms, syncCursors } from "@/lib/db/schema";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 type Database = NodePgDatabase<any>;
@@ -113,4 +113,59 @@ export async function syncCatalog(
     if (batch.length < pageSize) return { games: total, cursor, done: true };
   }
   return { games: total, cursor, done: false };
+}
+
+const backfillCursor = "igdb-backfill";
+const day = 24 * 60 * 60 * 1000;
+
+// The nightly job: first games IGDB changed in the last two days, so one
+// missed run is covered by the next; then, with the time left, the full
+// backfill continues from where the last run stopped until it reaches the end.
+export async function runNightlySync(
+  db: Database,
+  source: CatalogSource,
+  {
+    deadline,
+    now = Date.now(),
+    pageSize,
+    backfillPages,
+  }: {
+    deadline: number;
+    now?: number;
+    pageSize?: number;
+    backfillPages?: number;
+  },
+) {
+  const updated = await syncCatalog(db, source, {
+    updatedSince: new Date(now - 2 * day),
+    deadline,
+    pageSize,
+  });
+
+  const [saved] = await db
+    .select()
+    .from(syncCursors)
+    .where(eq(syncCursors.name, backfillCursor));
+  if (saved?.done || Date.now() >= deadline) {
+    return { updated, backfill: saved ?? null };
+  }
+  const result = await syncCatalog(db, source, {
+    after: saved?.cursor ?? 0,
+    deadline,
+    pageSize,
+    maxPages: backfillPages,
+  });
+  const backfill = {
+    name: backfillCursor,
+    cursor: result.cursor,
+    done: result.done,
+  };
+  await db
+    .insert(syncCursors)
+    .values(backfill)
+    .onConflictDoUpdate({
+      target: syncCursors.name,
+      set: { cursor: backfill.cursor, done: backfill.done },
+    });
+  return { updated, backfill };
 }

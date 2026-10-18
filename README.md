@@ -71,8 +71,10 @@ The browser tests are run separately and is not part of `pnpm check`.
   (Twitch client-credentials token, 4 requests per second), and
   `lib/catalog/sync.ts` upserts games, platforms and their links by IGDB id.
   Vercel Cron calls `/api/cron/igdb-sync` nightly (`vercel.json`) with
-  `Authorization: Bearer $CRON_SECRET` to sync games changed in the last two
-  days.
+  `Authorization: Bearer $CRON_SECRET`. Each run syncs games changed in the
+  last two days, then continues the full backfill from the cursor saved in
+  `sync_cursors`, so a new database fills itself over a few runs (or faster by
+  pressing Run on the cron job in the Vercel dashboard).
 - `lib/auth.ts`: Better Auth server config mapped onto the `users`, `sessions`,
   `accounts` and `verifications` tables; `lib/auth-client.ts` is the browser
   client. The API lives at `app/api/auth/[...all]`, with pages at `/sign-up`,

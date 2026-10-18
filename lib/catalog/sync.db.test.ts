@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { CatalogGame, CatalogSource } from "@/lib/catalog/source";
-import { syncCatalog } from "@/lib/catalog/sync";
+import { runNightlySync, syncCatalog } from "@/lib/catalog/sync";
 import { gamePlatforms, games, platforms } from "@/lib/db/schema";
 import { mapIgdbGame, type IgdbGame } from "@/lib/igdb/source";
 import fixture from "@/lib/igdb/__fixtures__/games.json";
@@ -29,7 +29,9 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
   });
 
   beforeEach(async () => {
-    await pool.query("TRUNCATE games, platforms RESTART IDENTITY CASCADE");
+    await pool.query(
+      "TRUNCATE games, platforms, sync_cursors RESTART IDENTITY CASCADE",
+    );
   });
 
   afterAll(async () => {
@@ -90,5 +92,39 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
       deadline: 0,
     });
     expect(result).toEqual({ games: 1, cursor: 1942, done: false });
+  });
+
+  it("backfills across nightly runs without skipping ids", async () => {
+    const all = [...catalog];
+    const recent: CatalogGame[] = [];
+    const source: CatalogSource = {
+      async fetchGames({ after, limit, updatedSince }) {
+        return (updatedSince ? recent : all)
+          .filter((game) => game.igdbId > after)
+          .slice(0, limit);
+      },
+    };
+    const deadline = Date.now() + 60_000;
+
+    // Night one runs out of time after one backfill page.
+    const first = await runNightlySync(db, source, {
+      deadline,
+      pageSize: 1,
+      backfillPages: 1,
+    });
+    expect(first.backfill).toMatchObject({ cursor: 1942, done: false });
+
+    // A brand-new game with a high id arrives as a recent change; the backfill
+    // must still pick up the older game it had not reached yet.
+    const newGame = { ...catalog[0], igdbId: 999_999, slug: "brand-new" };
+    all.push(newGame);
+    recent.push(newGame);
+    const second = await runNightlySync(db, source, { deadline, pageSize: 1 });
+    expect(second.backfill).toMatchObject({ cursor: 999_999, done: true });
+    expect(await db.$count(games)).toBe(3);
+
+    // Once done, later nights skip the backfill.
+    const third = await runNightlySync(db, source, { deadline });
+    expect(third.backfill).toMatchObject({ done: true });
   });
 });
