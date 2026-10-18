@@ -100,7 +100,9 @@ The browser tests are run separately and is not part of `pnpm check`.
 - `lib/social/`: one-way follows, player search (`/players`) and the home
   feed. Signed-in players see activity from the people they follow at `/`;
   a play logged with a review shows once, and hidden reviews and private
-  lists stay out.
+  lists stay out. Players like other players' reviews and public lists
+  (`lib/social/likes.ts`); reviews keep a running `like_count`, kept
+  in step by a trigger on `likes`.
 - `lib/auth.ts`: Better Auth server config mapped onto the `users`, `sessions`,
   `accounts` and `verifications` tables; `lib/auth-client.ts` is the browser
   client. The API lives at `app/api/auth/[...all]`, with pages at `/sign-up`,
