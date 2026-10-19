@@ -33,7 +33,12 @@ export default async function DiaryPage(props: PageProps<"/diary">) {
 
   return (
     <main className="mx-auto max-w-3xl space-y-8 px-6 py-12">
-      <h1 className="text-3xl font-semibold tracking-tight">Your diary</h1>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h1 className="text-3xl font-semibold tracking-tight">Your diary</h1>
+        <Link href="/diary/import" className="text-sm underline">
+          Import games
+        </Link>
+      </div>
       {months.length === 0 && page === 1 && (
         <p className="text-muted-foreground">
           Nothing logged yet.{" "}
