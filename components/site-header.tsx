@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SparkMark, Wordmark } from "@/components/brand";
 
 // Static on purpose: it reads no session, so pages stay cheap to render.
 export function SiteHeader() {
@@ -10,9 +11,10 @@ export function SiteHeader() {
       >
         <Link
           href="/"
-          className="font-semibold tracking-tight whitespace-nowrap"
+          className="flex items-center gap-1.5 text-lg leading-none whitespace-nowrap"
         >
-          Critical Hits
+          <SparkMark className="size-5" />
+          <Wordmark />
         </Link>
         <Link href="/games" className="hover:underline">
           Games
