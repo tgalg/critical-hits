@@ -12,7 +12,9 @@ export function GameRow({ row }: { row: BrowseRow }) {
       </h2>
       <ScrollRow
         label={row.title}
-        className="-mx-6 flex snap-x scroll-px-6 gap-4 px-6 pb-2"
+        // The list scrolls, so it clips anything outside its padding: pt-1
+        // leaves room for the hover ring above the covers.
+        className="-mx-6 flex snap-x scroll-px-6 gap-4 px-6 pt-1 pb-2"
       >
         {row.games.map((game) => (
           <li key={game.slug} className="w-28 shrink-0 snap-start sm:w-36">
