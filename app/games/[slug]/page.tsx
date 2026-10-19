@@ -152,6 +152,9 @@ export default async function GamePage(props: PageProps<"/games/[slug]">) {
                 slug={game.slug}
                 platforms={game.platforms}
                 statuses={statusOptions}
+                reviewedLogId={
+                  plays.find((play) => play.reviewId !== null)?.id ?? null
+                }
                 submitLabel="Save log"
               />
             </div>

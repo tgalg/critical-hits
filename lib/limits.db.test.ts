@@ -1,6 +1,5 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { upsertCatalogGames } from "@/lib/catalog/sync";
 import {
   activities,
   games,
@@ -15,6 +14,7 @@ import { createLog, deleteLog, LogError } from "@/lib/logs/service";
 import { ModerationError, reportReview } from "@/lib/moderation/service";
 import {
   hasTestDatabase,
+  addGames,
   openTestDatabase,
   resetTestDatabase,
 } from "@/lib/test-database";
@@ -40,7 +40,8 @@ const list = (title: string) => ({
 
 describe.skipIf(!hasTestDatabase)("posting limits", () => {
   const { pool, db } = openTestDatabase();
-  let hades: number;
+  // A game per review, since a player reviews each game once.
+  let many: number[];
 
   beforeAll(async () => {
     await resetTestDatabase(pool, db);
@@ -59,18 +60,7 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
         createdAt: sql`now() - interval '2 days'`,
       },
     ]);
-    await upsertCatalogGames(db, [
-      {
-        igdbId: 1,
-        slug: "hades",
-        title: "Hades",
-        coverUrl: null,
-        releaseDate: null,
-        summary: null,
-        platforms: [],
-      },
-    ]);
-    [{ id: hades }] = await db.select({ id: games.id }).from(games);
+    many = await addGames(db, 40);
   });
 
   afterAll(async () => {
@@ -79,10 +69,10 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
 
   it("caps a new account's reviews per hour and saves nothing over it", async () => {
     for (let i = 0; i < hourlyLimits.review.newAccount; i++) {
-      await createLog(db, "new", hades, reviewed(`Review ${i}`));
+      await createLog(db, "new", many[i], reviewed(`Review ${i}`));
     }
     await expect(
-      createLog(db, "new", hades, reviewed("One too many")),
+      createLog(db, "new", many.at(-1)!, reviewed("One too many")),
     ).rejects.toThrow(LogError);
     expect(await db.$count(reviews)).toBe(hourlyLimits.review.newAccount);
     // The rejected log was rolled back with its review.
@@ -95,7 +85,7 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
 
   it("gives older accounts the higher limit and forgets old posts", async () => {
     for (let i = 0; i < hourlyLimits.review.newAccount + 1; i++) {
-      await createLog(db, "old", hades, reviewed(`Review ${i}`));
+      await createLog(db, "old", many[i], reviewed(`Review ${i}`));
     }
     expect(await mayReview()).toBe(true);
     await db.insert(postingEvents).values(
@@ -147,11 +137,16 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
 
   it("still counts reviews and lists that were deleted", async () => {
     for (let i = 0; i < hourlyLimits.review.newAccount; i++) {
-      const logId = await createLog(db, "new", hades, reviewed(`Review ${i}`));
+      const logId = await createLog(
+        db,
+        "new",
+        many[i],
+        reviewed(`Review ${i}`),
+      );
       await deleteLog(db, "new", logId);
     }
     await expect(
-      createLog(db, "new", hades, reviewed("Again")),
+      createLog(db, "new", many.at(-1)!, reviewed("Again")),
     ).rejects.toThrow(LogError);
     for (let i = 0; i < hourlyLimits.list.newAccount; i++) {
       await deleteList(db, "new", await createList(db, "new", list(`L${i}`)));
@@ -171,7 +166,7 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
 
     const reviewIds: number[] = [];
     for (let i = 0; i <= hourlyLimits.report.newAccount; i++) {
-      const logId = await createLog(db, "old", hades, reviewed(`R${i}`));
+      const logId = await createLog(db, "old", many[i], reviewed(`R${i}`));
       const [row] = await db
         .select({ id: reviews.id })
         .from(reviews)
@@ -192,7 +187,7 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
     const logIds: number[] = [];
     const reviewIds: number[] = [];
     for (let i = 0; i <= hourlyLimits.report.newAccount; i++) {
-      const logId = await createLog(db, "old", hades, reviewed(`R${i}`));
+      const logId = await createLog(db, "old", many[i], reviewed(`R${i}`));
       const [row] = await db
         .select({ id: reviews.id })
         .from(reviews)
@@ -212,7 +207,7 @@ describe.skipIf(!hasTestDatabase)("posting limits", () => {
   it("treats a doubled report on the last free slot as a repeat", async () => {
     const reviewIds: number[] = [];
     for (let i = 0; i < hourlyLimits.report.newAccount; i++) {
-      const logId = await createLog(db, "old", hades, reviewed(`R${i}`));
+      const logId = await createLog(db, "old", many[i], reviewed(`R${i}`));
       const [row] = await db
         .select({ id: reviews.id })
         .from(reviews)

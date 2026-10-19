@@ -22,6 +22,7 @@ import {
 } from "@/lib/moderation/service";
 import {
   hasTestDatabase,
+  addGames,
   openTestDatabase,
   resetTestDatabase,
 } from "@/lib/test-database";
@@ -77,8 +78,13 @@ describe.skipIf(!hasTestDatabase)("moderation", () => {
     await pool.end();
   });
 
-  const anasReview = async () => {
-    const logId = await createLog(db, "ana", hades, reviewed("Buy cheap gold"));
+  const anasReview = async (gameId = hades) => {
+    const logId = await createLog(
+      db,
+      "ana",
+      gameId,
+      reviewed("Buy cheap gold"),
+    );
     const [review] = await db
       .select({ id: reviews.id })
       .from(reviews)
@@ -139,7 +145,9 @@ describe.skipIf(!hasTestDatabase)("moderation", () => {
 
   it("never leaves an open report on a review hidden at the same time", async () => {
     for (let round = 0; round < 20; round++) {
-      const { reviewId } = await anasReview();
+      // A fresh game each round, since a player reviews each game once.
+      const [gameId] = await addGames(db, 1);
+      const { reviewId } = await anasReview(gameId);
       await Promise.allSettled([
         reportReview(db, "ben", reviewId, "spam"),
         hideReview(db, reviewId),

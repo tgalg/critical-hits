@@ -25,6 +25,7 @@ import {
 } from "@/lib/social/service";
 import {
   hasTestDatabase,
+  addGames,
   openTestDatabase,
   resetTestDatabase,
 } from "@/lib/test-database";
@@ -135,16 +136,12 @@ describe.skipIf(!hasTestDatabase)("social", () => {
         review: { body: "Still great.", containsSpoilers: false },
       }),
     );
-    const hidden = await createLog(
-      db,
-      "ben",
-      hades,
-      play({ review: { body: "Spam.", containsSpoilers: false } }),
-    );
+    // A second review of the same game can only come from before reviews
+    // were one per game, so it's written directly.
+    const hidden = await createLog(db, "ben", hades, play());
     await db
-      .update(reviews)
-      .set({ hiddenAt: sql`now()` })
-      .where(eq(reviews.logId, hidden));
+      .insert(reviews)
+      .values({ logId: hidden, body: "Spam.", hiddenAt: sql`now()` });
     await createList(db, "ben", list("Public picks"));
     await createList(db, "ben", list("Secret", false));
     // Cy isn't followed, so their play stays out of Ana's feed.
@@ -233,11 +230,13 @@ describe.skipIf(!hasTestDatabase)("social", () => {
   });
 
   it("lists other players' visible reviews, recent and liked first", async () => {
-    const review = async (userId: string, body: string) => {
+    // A player reviews each game once, so repeat reviewers use another game.
+    const [other] = await addGames(db, 1);
+    const review = async (userId: string, body: string, gameId = hades) => {
       const logId = await createLog(
         db,
         userId,
-        hades,
+        gameId,
         play({ review: { body, containsSpoilers: false } }),
       );
       const [row] = await db
@@ -246,10 +245,10 @@ describe.skipIf(!hasTestDatabase)("social", () => {
         .where(eq(reviews.logId, logId));
       return row.id;
     };
-    const old = await review("ben", "Old favourite");
+    const old = await review("ben", "Old favourite", other);
     const liked = await review("ben", "Liked");
     await review("cy", "Plain");
-    const hidden = await review("cy", "Hidden");
+    const hidden = await review("cy", "Hidden", other);
     await review("ana", "Mine");
     await setLike(db, "ana", "review", old, true);
     await setLike(db, "ana", "review", liked, true);

@@ -26,7 +26,10 @@ export function SiteHeader() {
         <Link href="/lists" className="hover:underline">
           Lists
         </Link>
-        <Link href="/account" className="ml-auto hover:underline">
+        <Link href="/profile" className="ml-auto hover:underline">
+          Profile
+        </Link>
+        <Link href="/account" className="hover:underline">
           Account
         </Link>
       </nav>
