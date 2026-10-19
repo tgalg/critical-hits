@@ -2,6 +2,7 @@ import Link from "next/link";
 import { GameReviews } from "@/components/logs/game-reviews";
 import { Feed } from "@/components/social/feed";
 import { PlayerSearch } from "@/components/social/player-search";
+import { SparkMark, Wordmark } from "@/components/brand";
 import { Card, CardContent } from "@/components/ui/card";
 import { getDatabase } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -106,8 +107,9 @@ export default async function Home(props: PageProps<"/">) {
           <p className="text-sm font-medium tracking-widest text-primary uppercase">
             Your next favorite game starts here
           </p>
-          <h1 className="text-5xl font-semibold tracking-tight sm:text-6xl">
-            Critical Hits
+          <h1 className="flex items-center gap-3 text-5xl leading-none sm:text-6xl">
+            <SparkMark className="size-12 sm:size-14" />
+            <Wordmark />
           </h1>
           <p className="max-w-lg text-lg leading-relaxed text-muted-foreground">
             Keep a diary of the games you play. Share your reviews, build your
