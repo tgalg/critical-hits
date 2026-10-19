@@ -91,21 +91,26 @@ export function gamesQuery({ after, limit, updatedSince }: CatalogPage) {
 
 const day = 24 * 60 * 60 * 1000;
 
-// IGDB's page limit is 500: the most rated games of all time, the best rated
-// of those with enough ratings (the same bar as the "Highly rated" row), and
-// the most hyped games released in the last four months or due in the next six.
+// One page (IGDB's limit is 500) per ordering a browse row ranks by: the most
+// rated games of all time; the best rated with enough ratings (the "Highly
+// rated" bar); games released in the last four months, by hype and by rating
+// count; and the most hyped games due in the next six months.
 export function featuredQueries(now: Date) {
+  const time = now.getTime();
+  const recent = [
+    `first_release_date >= ${seconds(new Date(time - 120 * day))}`,
+    `first_release_date <= ${seconds(now)}`,
+  ];
+  const upcoming = [
+    `first_release_date > ${seconds(now)}`,
+    `first_release_date < ${seconds(new Date(time + 180 * day))}`,
+  ];
   return [
     query(["total_rating_count > 0"], "total_rating_count desc", 500),
     query(["total_rating_count >= 100"], "total_rating desc", 500),
-    query(
-      [
-        `first_release_date >= ${seconds(new Date(now.getTime() - 120 * day))}`,
-        `first_release_date < ${seconds(new Date(now.getTime() + 180 * day))}`,
-      ],
-      "hypes desc",
-      500,
-    ),
+    query(recent, "hypes desc", 500),
+    query(recent, "total_rating_count desc", 500),
+    query(upcoming, "hypes desc", 500),
   ];
 }
 
