@@ -18,6 +18,16 @@ export type CatalogGame = {
   platforms: CatalogPlatform[];
   // Left out by sources (and tests) that don't know genres.
   genres?: CatalogGenre[];
+  // Left out by sources that don't know popularity; the game then has none.
+  popularity?: CatalogPopularity;
+};
+
+export type CatalogPopularity = {
+  // 0-100, or null when nobody has rated the game.
+  rating: number | null;
+  ratingCount: number;
+  // Interest in an unreleased game (IGDB "hypes").
+  hypes: number;
 };
 
 export type CatalogPage = {
@@ -30,4 +40,8 @@ export type CatalogPage = {
 
 export interface CatalogSource {
   fetchGames(page: CatalogPage): Promise<CatalogGame[]>;
+  // The most rated games and the most anticipated recent and upcoming ones,
+  // refreshed every night so the browse rows stay current even before the
+  // backfill reaches them.
+  fetchFeatured?(now: Date): Promise<CatalogGame[]>;
 }

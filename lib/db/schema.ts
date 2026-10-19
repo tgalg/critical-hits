@@ -96,9 +96,16 @@ export const games = pgTable(
     // Denormalised by a background job; ratings are 1-10 half-stars.
     avgRating: numeric("avg_rating", { precision: 4, scale: 2 }),
     ratingCount: integer("rating_count").notNull().default(0),
+    // IGDB's own popularity signals, which carry the browse rows on /games
+    // until the site has enough ratings of its own. igdbRating is 0-100.
+    igdbRating: numeric("igdb_rating", { precision: 5, scale: 2 }),
+    igdbRatingCount: integer("igdb_rating_count").notNull().default(0),
+    igdbHypes: integer("igdb_hypes").notNull().default(0),
   },
   (t) => [
     index("games_title_trgm_idx").using("gin", t.title.op("gin_trgm_ops")),
+    index("games_igdb_rating_count_idx").on(t.igdbRatingCount),
+    index("games_release_date_idx").on(t.releaseDate),
   ],
 );
 

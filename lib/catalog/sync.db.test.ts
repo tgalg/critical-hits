@@ -124,6 +124,69 @@ describe.skipIf(!hasTestDatabase)("catalog sync", () => {
     expect(await db.$count(gameGenres)).toBe(0);
   });
 
+  it("keeps popularity when a source leaves it out", async () => {
+    await syncCatalog(db, fixedSource(catalog));
+    const witcher = () =>
+      db
+        .select({
+          rating: games.igdbRating,
+          count: games.igdbRatingCount,
+          hypes: games.igdbHypes,
+        })
+        .from(games)
+        .where(eq(games.igdbId, 1942));
+    expect(await witcher()).toEqual([
+      { rating: "92.85", count: 3125, hypes: 40 },
+    ]);
+    const withoutPopularity = catalog.map((game) => {
+      const copy = { ...game, title: `${game.title}!` };
+      delete copy.popularity;
+      return copy;
+    });
+    await syncCatalog(db, fixedSource(withoutPopularity));
+    expect(await witcher()).toEqual([
+      { rating: "92.85", count: 3125, hypes: 40 },
+    ]);
+    // A batch can mix both kinds.
+    await syncCatalog(
+      db,
+      fixedSource([
+        {
+          ...catalog[0],
+          popularity: { rating: 90, ratingCount: 4000, hypes: 0 },
+        },
+        withoutPopularity[1],
+      ]),
+    );
+    expect(await witcher()).toEqual([
+      { rating: "90.00", count: 4000, hypes: 0 },
+    ]);
+  });
+
+  it("refreshes featured games every night", async () => {
+    const popular = {
+      ...catalog[1],
+      popularity: { rating: 93, ratingCount: 2000, hypes: 0 },
+    };
+    const source: CatalogSource = {
+      async fetchGames() {
+        return [];
+      },
+      async fetchFeatured() {
+        return [popular];
+      },
+    };
+    const run = await runNightlySync(db, source, {
+      deadline: Date.now() + 60_000,
+    });
+    expect(run.featured).toBe(1);
+    const [hades] = await db
+      .select({ count: games.igdbRatingCount })
+      .from(games)
+      .where(eq(games.igdbId, 113112));
+    expect(hades.count).toBe(2000);
+  });
+
   it("stops after maxPages and resumes from the cursor", async () => {
     const partial = await syncCatalog(db, fixedSource(catalog), {
       pageSize: 1,

@@ -1,4 +1,19 @@
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  ilike,
+  isNotNull,
+  lt,
+  lte,
+  or,
+  sql,
+  type SQL,
+  type SQLWrapper,
+} from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import { gamePlatforms, games, platforms } from "@/lib/db/schema";
 
@@ -13,12 +28,7 @@ export async function searchGames(db: Database, query: string, limit = 24) {
   const q = query.trim();
   if (!q) return [];
   return db
-    .select({
-      slug: games.slug,
-      title: games.title,
-      coverUrl: games.coverUrl,
-      releaseDate: games.releaseDate,
-    })
+    .select(coverColumns)
     .from(games)
     .where(
       or(sql`${games.title} % ${q}`, ilike(games.title, `%${escapeLike(q)}%`)),
@@ -29,6 +39,82 @@ export async function searchGames(db: Database, query: string, limit = 24) {
       asc(games.title),
     )
     .limit(limit);
+}
+
+const coverColumns = {
+  slug: games.slug,
+  title: games.title,
+  coverUrl: games.coverUrl,
+  releaseDate: games.releaseDate,
+};
+
+export type BrowseGame = {
+  slug: string;
+  title: string;
+  coverUrl: string | null;
+  releaseDate: string | null;
+};
+
+export type BrowseRow = { id: string; title: string; games: BrowseGame[] };
+
+const day = 24 * 60 * 60 * 1000;
+const isoDate = (time: number) => new Date(time).toISOString().slice(0, 10);
+
+// Rows of covers for the Games page, so players have something to log before
+// anyone they follow has. Until the site has ratings of its own they lean on
+// IGDB's counts; rows with nothing in them are left out. Each row's order and
+// date window match a page of the nightly featured refresh (see
+// featuredQueries in lib/igdb/source.ts), so its top games are kept current.
+export async function getBrowseRows(
+  db: Database,
+  { now = Date.now(), limit = 12 }: { now?: number; limit?: number } = {},
+): Promise<BrowseRow[]> {
+  const today = isoDate(now);
+  const rows = (where: (SQL | undefined)[], ...order: SQLWrapper[]) =>
+    db
+      .select(coverColumns)
+      .from(games)
+      .where(and(isNotNull(games.coverUrl), ...where))
+      .orderBy(...order.map((column) => desc(column)), asc(games.title))
+      .limit(limit);
+
+  const [popular, highlyRated, newReleases, comingSoon] = await Promise.all([
+    rows(
+      [or(gt(games.igdbRatingCount, 0), gt(games.ratingCount, 0))],
+      games.igdbRatingCount,
+      games.ratingCount,
+    ),
+    // Enough ratings that a handful of perfect scores can't top the row.
+    rows(
+      [isNotNull(games.igdbRating), gte(games.igdbRatingCount, 100)],
+      games.igdbRating,
+      games.igdbRatingCount,
+    ),
+    rows(
+      [
+        lte(games.releaseDate, today),
+        gt(games.releaseDate, isoDate(now - 90 * day)),
+        gt(games.igdbHypes, 0),
+      ],
+      games.igdbHypes,
+      games.releaseDate,
+    ),
+    rows(
+      [
+        gt(games.releaseDate, today),
+        lt(games.releaseDate, isoDate(now + 180 * day)),
+        gt(games.igdbHypes, 0),
+      ],
+      games.igdbHypes,
+    ),
+  ]);
+
+  return [
+    { id: "popular", title: "Popular", games: popular },
+    { id: "highly-rated", title: "Highly rated", games: highlyRated },
+    { id: "new-releases", title: "New releases", games: newReleases },
+    { id: "coming-soon", title: "Coming soon", games: comingSoon },
+  ].filter((row) => row.games.length > 0);
 }
 
 export async function getGameBySlug(db: Database, slug: string) {
