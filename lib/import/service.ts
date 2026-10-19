@@ -101,7 +101,7 @@ export async function matchEntries(
 // move when the list changes, so comparing days would import them again.
 // Existing plays use the diary's year, which falls back from the finish
 // date to the start date to the day the log was written.
-async function markDuplicates(
+export async function markDuplicates(
   db: Database | Transaction,
   userId: string,
   entries: MatchedEntry[],
