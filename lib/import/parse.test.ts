@@ -51,6 +51,15 @@ describe("parseImportText", () => {
 });
 
 describe("normaliseTitle", () => {
+  it("won't compare titles in other alphabets", () => {
+    expect(normaliseTitle("ファイナルファンタジー7")).toBeNull();
+    expect(
+      parseImportText("ファイナルファンタジー7", "2026-10-19").map(
+        (e) => e.title,
+      ),
+    ).toEqual(["ファイナルファンタジー7"]);
+  });
+
   it("ignores accents, case and punctuation", () => {
     expect(normaliseTitle("Pokémon: Soul Silver")).toBe(
       normaliseTitle("pokemon soul  silver"),

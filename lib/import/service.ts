@@ -43,17 +43,20 @@ const releaseYearIs = (year: number | null) =>
 async function findGame(db: Database, entry: ImportEntry) {
   const normalised = normaliseTitle(entry.title);
   // Among games sharing a title, the one most players know is the likelier.
-  const [exact] = await db
-    .select(gameColumns)
-    .from(games)
-    .where(
-      and(
-        sql`${normalisedTitle} = ${normalised}`,
-        releaseYearIs(entry.releaseYear),
-      ),
-    )
-    .orderBy(sql`${games.igdbRatingCount} desc`, games.id)
-    .limit(1);
+  const [exact] =
+    normalised === null
+      ? []
+      : await db
+          .select(gameColumns)
+          .from(games)
+          .where(
+            and(
+              sql`${normalisedTitle} = ${normalised}`,
+              releaseYearIs(entry.releaseYear),
+            ),
+          )
+          .orderBy(sql`${games.igdbRatingCount} desc`, games.id)
+          .limit(1);
   if (exact) return { game: exact, match: "exact" as const };
   const [close] = await db
     .select(gameColumns)
@@ -151,6 +154,16 @@ export async function importEntries(
     // leaves the row's key free for createLog's foreign-key checks.
     await tx.execute(
       sql`SELECT id FROM users WHERE id = ${userId} FOR NO KEY UPDATE`,
+    );
+    // Locks the games too, in id order, so a play being logged from a game
+    // page commits before the duplicate check below and is seen by it.
+    await tx.execute(
+      sql`SELECT id FROM games WHERE id IN (${sql.join(
+        [...new Set(candidates.map((entry) => entry.game!.id))].map(
+          (id) => sql`${id}`,
+        ),
+        sql`, `,
+      )}) ORDER BY id FOR UPDATE`,
     );
     const chosen = (await markDuplicates(tx, userId, candidates)).filter(
       (entry) => !entry.duplicate,

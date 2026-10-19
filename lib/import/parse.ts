@@ -41,11 +41,14 @@ function cleanLine(raw: string) {
 }
 
 // Lowercase letters and digits only, so "Pokémon: Soul Silver" and
-// "Pokemon Soul Silver" compare equal.
+// "Pokemon Soul Silver" compare equal. Returns null for titles with letters
+// outside the Latin alphabet, which this can't compare without losing them.
 export function normaliseTitle(title: string) {
-  return title
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
+  const latin = title.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+  if (/[^\p{ASCII}]/u.test(latin.replace(/[^\p{L}\p{N}]/gu, ""))) {
+    return null;
+  }
+  return latin
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
@@ -94,7 +97,7 @@ export function parseImportText(text: string, today: string): ImportEntry[] {
       releaseYear = Number(hint[1]);
       title = title.slice(0, hint.index).trim();
     }
-    if (!normaliseTitle(title)) continue;
+    if (!title || normaliseTitle(title) === "") continue;
     const entry: ImportEntry = {
       index: entries.length,
       line,
