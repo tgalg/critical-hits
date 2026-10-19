@@ -427,3 +427,9 @@ export const syncCursors = pgTable("sync_cursors", {
   done: boolean("done").notNull().default(false),
   updatedAt: updatedAt(),
 });
+
+// One-off data jobs that production deploys have run, so each runs once.
+export const oneOffJobs = pgTable("one_off_jobs", {
+  name: text("name").primaryKey(),
+  ranAt: createdAt(),
+});

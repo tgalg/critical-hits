@@ -1,0 +1,218 @@
+import { and, eq, inArray, or, sql } from "drizzle-orm";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres";
+import {
+  backlogItems,
+  gamePlatforms,
+  logs,
+  oneOffJobs,
+  platforms,
+  reviews,
+  users,
+} from "@/lib/db/schema";
+import { parseImportText } from "@/lib/import/parse";
+import { matchEntries } from "@/lib/import/service";
+import { recomputeGameRating } from "@/lib/logs/service";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
+type Database = NodePgDatabase<any>;
+
+// A play from a player's own records, with whatever detail they kept.
+export type SeedPlay = {
+  // Written as an import line: "Title" or "Title (release year)".
+  title: string;
+  year: number;
+  // When the records give exact days; otherwise the play is spread over
+  // its year like a pasted import.
+  startedOn?: string;
+  finishedOn?: string;
+  rating?: number;
+  hours?: number;
+  // A platform name or abbreviation, used only if the game is on it.
+  platform?: string;
+  review?: string;
+};
+
+export type SeedResult =
+  | { status: "done"; added: number; missing: string[] }
+  | { status: "skipped"; reason: string };
+
+// Loads a player's past plays once, as a one-off job named `job`. Like an
+// import, the plays add no feed activity and skip any game the player
+// already logged that year; unlike one, they carry ratings, hours,
+// platforms and reviews, and only exact title matches count. The job is recorded in the same transaction, so a
+// failed run leaves nothing behind and is tried again on the next deploy.
+export async function seedPlays(
+  db: Database,
+  job: string,
+  email: string,
+  plays: SeedPlay[],
+): Promise<SeedResult> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        sql`lower(${users.email}) = ${email.toLowerCase()}`,
+        eq(users.emailVerified, true),
+      ),
+    );
+  if (!user) return { status: "skipped", reason: "no verified user" };
+  const [ran] = await db
+    .select({ name: oneOffJobs.name })
+    .from(oneOffJobs)
+    .where(eq(oneOffJobs.name, job));
+  if (ran) return { status: "skipped", reason: "already ran" };
+
+  // Each year becomes a heading so year-only plays get spread dates.
+  const byYear = new Map<number, SeedPlay[]>();
+  for (const play of plays) {
+    byYear.set(play.year, [...(byYear.get(play.year) ?? []), play]);
+  }
+  const ordered = [...byYear.values()].flat();
+  const text = [...byYear]
+    .map(([year, section]) => [year, ...section.map((p) => p.title)].join("\n"))
+    .join("\n");
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = parseImportText(text, today).map((entry) => {
+    const play = ordered[entry.index];
+    return {
+      ...entry,
+      finishedOn: play.finishedOn ?? entry.finishedOn,
+    };
+  });
+  if (entries.length !== ordered.length) {
+    throw new Error("Every seed play needs a title.");
+  }
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT id FROM users WHERE id = ${user.id} FOR NO KEY UPDATE`,
+    );
+    const inserted = await tx
+      .insert(oneOffJobs)
+      .values({ name: job })
+      .onConflictDoNothing()
+      .returning({ name: oneOffJobs.name });
+    if (inserted.length === 0) {
+      return { status: "skipped" as const, reason: "already ran" };
+    }
+    // Matches inside the transaction, after the user lock, so a play the
+    // player logs meanwhile is seen as a duplicate.
+    const matched = await matchEntries(tx as Database, user.id, entries);
+    // Nobody checks the matches of a seed, so only exact titles count.
+    const chosen = matched.filter(
+      (entry) => entry.match === "exact" && !entry.duplicate,
+    );
+    const gameIds = [...new Set(chosen.map((entry) => entry.game!.id))];
+    if (gameIds.length) {
+      await tx.execute(
+        sql`SELECT id FROM games WHERE id IN (${sql.join(
+          gameIds.map((id) => sql`${id}`),
+          sql`, `,
+        )}) ORDER BY id FOR UPDATE`,
+      );
+    }
+    const played = new Set(
+      gameIds.length
+        ? (
+            await tx
+              .select({ gameId: logs.gameId })
+              .from(logs)
+              .where(
+                and(eq(logs.userId, user.id), inArray(logs.gameId, gameIds)),
+              )
+          ).map((log) => log.gameId)
+        : [],
+    );
+    const reviewed = new Set(
+      gameIds.length
+        ? (
+            await tx
+              .select({ gameId: logs.gameId })
+              .from(reviews)
+              .innerJoin(logs, eq(logs.id, reviews.logId))
+              .where(
+                and(eq(logs.userId, user.id), inArray(logs.gameId, gameIds)),
+              )
+          ).map((log) => log.gameId)
+        : [],
+    );
+
+    // Oldest first, so the first play of a game is the one that isn't a
+    // replay and the latest rating is the one the game's average counts.
+    chosen.sort(
+      (a, b) =>
+        (a.finishedOn ?? "9999").localeCompare(b.finishedOn ?? "9999") ||
+        a.index - b.index,
+    );
+    for (const entry of chosen) {
+      const play = ordered[entry.index];
+      const gameId = entry.game!.id;
+      const platformId = play.platform
+        ? await findPlatform(tx as Database, gameId, play.platform)
+        : null;
+      const startedOn =
+        play.startedOn && entry.finishedOn && play.startedOn <= entry.finishedOn
+          ? play.startedOn
+          : null;
+      const [log] = await tx
+        .insert(logs)
+        .values({
+          userId: user.id,
+          gameId,
+          platformId,
+          status: "finished",
+          startedOn,
+          finishedOn: entry.finishedOn,
+          hours: play.hours === undefined ? null : String(play.hours),
+          rating: play.rating ?? null,
+          isReplay: played.has(gameId),
+        })
+        .returning({ id: logs.id });
+      played.add(gameId);
+      // A player reviews a game once, on the first play that has one.
+      if (play.review?.trim() && !reviewed.has(gameId)) {
+        await tx
+          .insert(reviews)
+          .values({ logId: log.id, body: play.review.trim() });
+        reviewed.add(gameId);
+      }
+    }
+    if (gameIds.length) {
+      await tx
+        .delete(backlogItems)
+        .where(
+          and(
+            eq(backlogItems.userId, user.id),
+            inArray(backlogItems.gameId, gameIds),
+          ),
+        );
+      for (const gameId of gameIds) {
+        await recomputeGameRating(tx as Database, gameId);
+      }
+    }
+    return {
+      status: "done" as const,
+      added: chosen.length,
+      missing: matched.filter((e) => e.match !== "exact").map((e) => e.line),
+    };
+  });
+}
+
+async function findPlatform(db: Database, gameId: number, name: string) {
+  const [platform] = await db
+    .select({ id: platforms.id })
+    .from(platforms)
+    .innerJoin(gamePlatforms, eq(gamePlatforms.platformId, platforms.id))
+    .where(
+      and(
+        eq(gamePlatforms.gameId, gameId),
+        or(
+          sql`lower(${platforms.name}) = ${name.toLowerCase()}`,
+          sql`lower(${platforms.abbreviation}) = ${name.toLowerCase()}`,
+        ),
+      ),
+    )
+    .limit(1);
+  return platform?.id ?? null;
+}

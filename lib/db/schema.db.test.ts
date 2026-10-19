@@ -70,6 +70,7 @@ describe.skipIf(!hasTestDatabase)("database schema", () => {
       "list_items",
       "lists",
       "logs",
+      "one_off_jobs",
       "platforms",
       "posting_events",
       "reports",

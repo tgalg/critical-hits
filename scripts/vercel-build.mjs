@@ -9,4 +9,14 @@ const run = (command) => execSync(command, { stdio: "inherit" });
 run("pnpm exec next build");
 if (process.env.VERCEL_ENV === "production") {
   run("node scripts/migrate.mjs");
+  // One-off data jobs run last, and a failure never fails the deploy: the
+  // next deploy tries them again.
+  try {
+    run(
+      "pnpm exec esbuild scripts/one-off-jobs.ts --bundle --platform=node --format=esm --packages=external --log-level=warning --outfile=.next/one-off-jobs.mjs",
+    );
+    run("node .next/one-off-jobs.mjs");
+  } catch {
+    console.error("One-off jobs failed; the next deploy runs them again.");
+  }
 }
