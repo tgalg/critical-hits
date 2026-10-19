@@ -5,6 +5,7 @@ import { normaliseTitle, type ImportEntry } from "@/lib/import/parse";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 type Database = NodePgDatabase<any>;
+type Transaction = Parameters<Parameters<Database["transaction"]>[0]>[0];
 
 // How alike a title must be (pg_trgm similarity, 0-1) to count as a close
 // match when no catalog title matches exactly.
@@ -88,29 +89,38 @@ export async function matchEntries(
       duplicate: false,
     });
   }
+  return markDuplicates(db, userId, matched);
+}
+
+// A play counts once per game per year: the dates of year-only entries
+// move when the list changes, so comparing days would import them again.
+// Existing plays use the diary's year, which falls back from the finish
+// date to the start date to the day the log was written.
+async function markDuplicates(
+  db: Database | Transaction,
+  userId: string,
+  entries: MatchedEntry[],
+) {
   const gameIds = [
-    ...new Set(matched.flatMap((entry) => (entry.game ? [entry.game.id] : []))),
+    ...new Set(entries.flatMap((entry) => (entry.game ? [entry.game.id] : []))),
   ];
   const existing = gameIds.length
     ? await db
-        .select({ gameId: logs.gameId, finishedOn: logs.finishedOn })
+        .select({
+          gameId: logs.gameId,
+          year: sql<string>`extract(year from coalesce(${logs.finishedOn}, ${logs.startedOn}, (${logs.createdAt} AT TIME ZONE 'UTC')::date))::text`,
+        })
         .from(logs)
         .where(and(eq(logs.userId, userId), inArray(logs.gameId, gameIds)))
     : [];
-  // A play counts once per game per year: the dates of year-only entries
-  // move when the list changes, so comparing days would import them again.
-  const yearKey = (gameId: number, finishedOn: string | null) =>
-    `${gameId}:${finishedOn?.slice(0, 4) ?? ""}`;
-  const seen = new Set(
-    existing.map((log) => yearKey(log.gameId, log.finishedOn)),
-  );
-  for (const entry of matched) {
+  const seen = new Set(existing.map((log) => `${log.gameId}:${log.year}`));
+  for (const entry of entries) {
     if (!entry.game) continue;
-    const key = yearKey(entry.game.id, entry.finishedOn);
+    const key = `${entry.game.id}:${entry.finishedOn?.slice(0, 4) ?? ""}`;
     entry.duplicate = seen.has(key);
     seen.add(key);
   }
-  return matched;
+  return entries;
 }
 
 // Logs the chosen entries as finished plays. Imported history is the past,
@@ -122,15 +132,23 @@ export async function importEntries(
   userId: string,
   entries: MatchedEntry[],
 ) {
-  const chosen = entries
-    .filter((entry) => entry.game && !entry.duplicate)
+  const candidates = entries
+    .filter((entry) => entry.game)
     .sort(
       (a, b) =>
         (a.finishedOn ?? "").localeCompare(b.finishedOn ?? "") ||
         a.index - b.index,
-    );
-  if (chosen.length === 0) return 0;
+    )
+    .map((entry) => ({ ...entry }));
+  if (candidates.length === 0) return 0;
   return db.transaction(async (tx) => {
+    // Locks the player so two imports at once run one after the other, and
+    // the second sees the first's plays when it checks for duplicates.
+    await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+    const chosen = (await markDuplicates(tx, userId, candidates)).filter(
+      (entry) => !entry.duplicate,
+    );
+    if (chosen.length === 0) return 0;
     const gameIds = [...new Set(chosen.map((entry) => entry.game!.id))];
     const played = new Set(
       (

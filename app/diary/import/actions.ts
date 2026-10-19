@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { getDatabase } from "@/lib/db";
-import { parseImportText } from "@/lib/import/parse";
+import {
+  importLineCount,
+  importLineLimit,
+  parseImportText,
+} from "@/lib/import/parse";
 import {
   importEntries,
   matchEntries,
@@ -54,6 +58,13 @@ export async function importAction(
   const version = previous.version + 1;
   const textValue = form.get("text");
   const text = typeof textValue === "string" ? textValue : "";
+  if (importLineCount(text) > importLineLimit) {
+    return {
+      version,
+      text,
+      message: `Paste at most ${importLineLimit} lines at a time.`,
+    };
+  }
   const today = new Date().toISOString().slice(0, 10);
   const entries = parseImportText(text, today);
   if (entries.length === 0) {

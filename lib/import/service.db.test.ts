@@ -132,4 +132,20 @@ describe.skipIf(!hasTestDatabase)("import", () => {
     expect(again.every((e) => e.duplicate)).toBe(true);
     expect(await importEntries(db, "ana", again)).toBe(0);
   });
+
+  it("rechecks duplicates when importing, using each play's diary year", async () => {
+    await db.insert(logs).values({
+      userId: "ana",
+      gameId: ids["hollow-knight"],
+      status: "finished",
+      startedOn: "2023-05-01",
+    });
+    const stale = await match("2024\nHollow Knight\n2023\nHollow Knight");
+    expect(stale.map((e) => e.duplicate)).toEqual([false, true]);
+    // A second tab that previewed before the first one imported.
+    const otherTab = stale.map((e) => ({ ...e }));
+    expect(await importEntries(db, "ana", stale)).toBe(1);
+    expect(await importEntries(db, "ana", otherTab)).toBe(0);
+    expect(await db.select().from(logs)).toHaveLength(2);
+  });
 });

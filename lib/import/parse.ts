@@ -64,8 +64,10 @@ function spreadDates(year: number, count: number, today: string) {
   );
 }
 
+export const importLineCount = (text: string) => text.split(/\r?\n/).length;
+
 export function parseImportText(text: string, today: string): ImportEntry[] {
-  const lines = text.split(/\r?\n/).slice(0, importLineLimit);
+  const lines = text.split(/\r?\n/);
   const entries: ImportEntry[] = [];
   // Entries under each year heading that still need a date.
   const undated = new Map<number, ImportEntry[]>();
