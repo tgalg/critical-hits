@@ -21,6 +21,7 @@ import {
   getOwnedLog,
   getUserLogsForGame,
   LogError,
+  oneReviewMessage,
   updateLog,
 } from "@/lib/logs/service";
 import {
@@ -305,10 +306,49 @@ describe.skipIf(!hasTestDatabase)("logs", () => {
     expect(await db.$count(activities)).toBe(1);
   });
 
+  it("lets a player review each game once", async () => {
+    const first = await createLog(db, "ana", hades, reviewed("Loved it."));
+    await expect(
+      createLog(db, "ana", hades, reviewed("Loved it again.")),
+    ).rejects.toThrow(oneReviewMessage);
+    // Nothing from the refused play is kept.
+    expect(await db.$count(logs)).toBe(1);
+
+    // A play without a review is fine, but it can't gain one later.
+    const replay = await createLog(db, "ana", hades, play({ isReplay: true }));
+    await expect(
+      updateLog(db, "ana", replay, reviewed("Sneaky second review")),
+    ).rejects.toThrow(oneReviewMessage);
+
+    // The review itself can still be edited, and other players and games
+    // are unaffected.
+    await updateLog(db, "ana", first, reviewed("Loved it, edited."));
+    await createLog(db, "ben", hades, reviewed("Mine too."));
+    await createLog(db, "ana", celeste, reviewed("Different game."));
+    expect(await db.$count(reviews)).toBe(3);
+
+    // Clearing the review frees the game for a new one.
+    await updateLog(db, "ana", first, play());
+    await updateLog(db, "ana", replay, reviewed("Second time round."));
+    expect(await db.$count(reviews)).toBe(3);
+  });
+
+  it("keeps one review per game when two plays race", async () => {
+    await Promise.allSettled([
+      createLog(db, "ana", hades, reviewed("One")),
+      createLog(db, "ana", hades, reviewed("Two")),
+      createLog(db, "ana", hades, reviewed("Three")),
+    ]);
+    expect(await db.$count(reviews)).toBe(1);
+  });
+
   it("lists a game's visible reviews, newest first", async () => {
     await createLog(db, "ana", hades, reviewed("First!"));
     await createLog(db, "ben", hades, reviewed("Spoilers ahead.", true));
-    const hidden = await createLog(db, "ben", hades, reviewed("Spam."));
+    // A second review of one game predates the one-review rule, so it's
+    // written directly.
+    const hidden = await createLog(db, "ben", hades, play());
+    await db.insert(reviews).values({ logId: hidden, body: "Spam." });
     await createLog(db, "ana", celeste, reviewed("Other game."));
     await db
       .update(reviews)

@@ -25,7 +25,7 @@ test("follows a player found by search, sees and likes their review", async ({
   const writerName = `writer${stamp}`;
   await signUp(writer, writerName);
   await writer.goto(`/games/${slug}`);
-  await writer.getByLabel("Rating").selectOption({ label: "4 stars" });
+  await writer.getByRole("radio", { name: "4 stars" }).check();
   await writer
     .getByRole("textbox", { name: "Review" })
     .fill("Feed-worthy, honestly.");

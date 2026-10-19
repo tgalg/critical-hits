@@ -39,29 +39,34 @@ test("logs a game, sees it in the diary, edits and deletes it", async ({
   await signUp(page, name);
 
   await page.goto(`/games/${slug}`);
-  await page.getByLabel("Status").selectOption("finished");
-  await page.getByLabel("Rating").selectOption({ label: "4.5 stars" });
-  await page
-    .getByLabel("Platform", { exact: true })
-    .selectOption({ label: "E2E Console" });
-  await page.getByLabel("Started").fill("2026-02-01");
-  await page.getByLabel("Finished").fill("2026-01-01");
+  await page.getByRole("radio", { name: "Finished" }).check();
+  await page.getByRole("radio", { name: "4.5 stars" }).check();
+  await page.getByRole("radio", { name: "E2E Console" }).check();
+  await page.getByRole("textbox", { name: "Started" }).fill("2026-02-01");
+  await page.getByRole("textbox", { name: "Finished" }).fill("2026-01-01");
   await page.getByRole("button", { name: "Save log" }).click();
   await expect(
     page.getByText("The finish date can't be before the start date."),
   ).toBeVisible();
   // The form keeps what was typed after an error.
-  await expect(page.getByLabel("Started")).toHaveValue("2026-02-01");
+  await expect(page.getByRole("textbox", { name: "Started" })).toHaveValue(
+    "2026-02-01",
+  );
 
-  await page.getByLabel("Finished").fill("2026-03-15");
-  await page.getByLabel("Hours played").fill("12.5");
-  await page.getByLabel("Favourite ♥").check();
+  await page.getByRole("textbox", { name: "Finished" }).fill("2026-03-15");
+  await page.getByLabel("Hours played", { exact: true }).fill("12.5");
+  await page.getByLabel("Loved it").check();
   await page
     .getByRole("textbox", { name: "Review" })
     .fill("The boss rush ending.\nWorth it.");
   await page.getByLabel("Contains spoilers").check();
   await page.getByRole("button", { name: "Save log" }).click();
   await expect(page.getByRole("status")).toHaveText("Logged.");
+  // The game is reviewed now, so another play links to that review instead.
+  await expect(
+    page.getByText("You've already reviewed this game."),
+  ).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Review" })).toBeHidden();
   // The review shows under Reviews, hidden behind its spoiler warning.
   const reviews = page.getByRole("region", { name: "Reviews" });
   await expect(reviews.getByText(name)).toBeVisible();
@@ -84,11 +89,12 @@ test("logs a game, sees it in the diary, edits and deletes it", async ({
   await expect(page.getByText("Reviewed")).toBeVisible();
 
   await page.getByRole("link", { name: "Edit E2E Log Legends log" }).click();
-  await expect(page.getByLabel("Rating")).toHaveValue("9");
+  await expect(page.getByRole("radio", { name: "4.5 stars" })).toBeChecked();
+  await expect(page.getByLabel("Loved it")).toBeChecked();
   await expect(page.getByRole("textbox", { name: "Review" })).toHaveValue(
     "The boss rush ending.\nWorth it.",
   );
-  await page.getByLabel("Rating").selectOption({ label: "2 stars" });
+  await page.getByRole("radio", { name: "2 stars" }).check();
   await page.getByRole("textbox", { name: "Review" }).fill("");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page).toHaveURL(/\/diary$/);

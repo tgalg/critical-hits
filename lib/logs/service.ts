@@ -81,11 +81,17 @@ async function deleteReview(tx: Transaction, reviewId: number) {
     );
 }
 
+export const oneReviewMessage =
+  "You've already reviewed this game. Edit that review instead.";
+
 // Makes the log's review match the form: creates it (with a `reviewed`
-// activity), updates it, or deletes it when the text was cleared.
+// activity), updates it, or deletes it when the text was cleared. A player
+// reviews a game once, however many plays they log; callers hold the game
+// lock, so two plays can't both add the first review.
 async function saveReview(
   tx: Transaction,
   userId: string,
+  gameId: number,
   logId: number,
   input: ReviewInput | null,
 ) {
@@ -101,6 +107,13 @@ async function saveReview(
     await tx.update(reviews).set(input).where(eq(reviews.id, existing.id));
     return;
   }
+  const [other] = await tx
+    .select({ id: reviews.id })
+    .from(reviews)
+    .innerJoin(logs, eq(logs.id, reviews.logId))
+    .where(and(eq(logs.userId, userId), eq(logs.gameId, gameId)))
+    .limit(1);
+  if (other) throw new LogError(oneReviewMessage);
   if (!(await canPost(tx, userId, "review"))) {
     throw new LogError(limitMessages.review);
   }
@@ -143,7 +156,7 @@ export async function createLog(
       .where(
         and(eq(backlogItems.userId, userId), eq(backlogItems.gameId, gameId)),
       );
-    await saveReview(tx, userId, log.id, review);
+    await saveReview(tx, userId, gameId, log.id, review);
     await recomputeGameRating(tx, gameId);
     return log.id;
   });
@@ -176,7 +189,7 @@ export async function updateLog(
       .update(logs)
       .set(fields)
       .where(and(eq(logs.id, logId), eq(logs.userId, userId)));
-    await saveReview(tx, userId, logId, review);
+    await saveReview(tx, userId, gameId, logId, review);
     await recomputeGameRating(tx, gameId);
     return gameId;
   });

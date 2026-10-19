@@ -38,6 +38,9 @@ test("edits a profile, picks a favourite and shows it publicly", async ({
   await page.getByRole("textbox", { name: "Review" }).fill("A keeper.");
   await page.getByRole("button", { name: "Save log" }).click();
   await expect(page.getByRole("status")).toHaveText("Logged.");
+  // The header's Profile link leads to the player's own public profile.
+  await page.getByRole("link", { name: "Profile", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`/u/${renamed}$`, "i"));
 
   const visitor = await browser.newPage();
   await visitor.goto(`/u/${renamed.toLowerCase()}`);

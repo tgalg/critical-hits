@@ -6,7 +6,7 @@ import { LogForm } from "@/components/logs/log-form";
 import { getGameBySlug } from "@/lib/catalog/queries";
 import { getDatabase } from "@/lib/db";
 import { logFormDefaults, statusOptions } from "@/lib/logs/form-defaults";
-import { getOwnedLog } from "@/lib/logs/service";
+import { getOwnedLog, getUserLogsForGame } from "@/lib/logs/service";
 import { getCurrentUser } from "@/lib/session";
 
 export const metadata: Metadata = { title: "Edit log · Critical Hits" };
@@ -23,6 +23,12 @@ export default async function EditLogPage(props: PageProps<"/logs/[id]/edit">) {
   if (!log) notFound();
   const game = await getGameBySlug(getDatabase(), log.game.slug);
   if (!game) notFound();
+  // The game's review may sit on another of the player's plays.
+  const reviewedLogId = log.review
+    ? null
+    : ((await getUserLogsForGame(getDatabase(), user.id, game.id)).find(
+        (play) => play.reviewId !== null,
+      )?.id ?? null);
 
   return (
     <main className="mx-auto max-w-2xl space-y-8 px-6 py-12">
@@ -47,6 +53,7 @@ export default async function EditLogPage(props: PageProps<"/logs/[id]/edit">) {
         platforms={game.platforms}
         statuses={statusOptions}
         defaults={logFormDefaults(log)}
+        reviewedLogId={reviewedLogId}
         submitLabel="Save changes"
       />
       <form action={removeLog} className="border-t pt-6">
