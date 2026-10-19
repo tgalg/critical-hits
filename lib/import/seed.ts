@@ -159,6 +159,12 @@ export async function seedPlays(
         play.startedOn && entry.finishedOn && play.startedOn <= entry.finishedOn
           ? play.startedOn
           : null;
+      // Dated as when the play happened, so a game's average keeps counting
+      // a newer play's rating over this older one's, and the review doesn't
+      // pass for something just written.
+      const playedAt = entry.finishedOn
+        ? new Date(`${entry.finishedOn}T12:00:00Z`)
+        : undefined;
       const [log] = await tx
         .insert(logs)
         .values({
@@ -171,19 +177,17 @@ export async function seedPlays(
           hours: play.hours === undefined ? null : String(play.hours),
           rating: play.rating ?? null,
           isReplay: played.has(gameId),
-          // Dated as when the play happened, so a game's average keeps
-          // counting a newer play's rating over this older one's.
-          ...(entry.finishedOn && {
-            createdAt: new Date(`${entry.finishedOn}T12:00:00Z`),
-          }),
+          createdAt: playedAt,
         })
         .returning({ id: logs.id });
       played.add(gameId);
       // A player reviews a game once, on the first play that has one.
       if (play.review?.trim() && !reviewed.has(gameId)) {
-        await tx
-          .insert(reviews)
-          .values({ logId: log.id, body: play.review.trim() });
+        await tx.insert(reviews).values({
+          logId: log.id,
+          body: play.review.trim(),
+          createdAt: playedAt,
+        });
         reviewed.add(gameId);
       }
     }

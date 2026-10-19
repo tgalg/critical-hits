@@ -91,6 +91,7 @@ describe.skipIf(!hasTestDatabase)("seedPlays", () => {
         platformId: logs.platformId,
         isReplay: logs.isReplay,
         review: reviews.body,
+        reviewedAt: reviews.createdAt,
       })
       .from(logs)
       .leftJoin(reviews, eq(reviews.logId, logs.id))
@@ -106,6 +107,7 @@ describe.skipIf(!hasTestDatabase)("seedPlays", () => {
       hours: "52.5",
       platformId: ids.switch,
       review: "Worth the wait.",
+      reviewedAt: new Date("2025-10-01T12:00:00Z"),
     });
     expect(await db.select().from(activities)).toEqual([]);
     const [knight] = await db
