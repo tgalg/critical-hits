@@ -81,14 +81,15 @@ export async function matchEntries(
   userId: string,
   entries: ImportEntry[],
 ): Promise<MatchedEntry[]> {
-  const matched: MatchedEntry[] = [];
-  for (const entry of entries) {
-    matched.push({
+  // Run together; the connection pool queues them, so a long list takes a
+  // few pooled round trips per batch rather than one after another.
+  const matched: MatchedEntry[] = await Promise.all(
+    entries.map(async (entry) => ({
       ...entry,
       ...(await findGame(db, entry)),
       duplicate: false,
-    });
-  }
+    })),
+  );
   return markDuplicates(db, userId, matched);
 }
 

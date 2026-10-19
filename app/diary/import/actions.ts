@@ -28,6 +28,9 @@ export type ImportState = {
   // The text the preview was made from; importing a different text previews
   // it again instead, so the ticked rows always mean what the player saw.
   previewedText?: string;
+  // The game each row matched, so a catalog change between preview and
+  // import shows the new matches instead of importing different games.
+  previewedMatches?: string;
   rows?: ImportPreviewRow[];
   imported?: number;
   message?: string;
@@ -72,10 +75,12 @@ export async function importAction(
   }
   const db = getDatabase();
   const matched = await matchEntries(db, userId, entries);
+  const matches = matched.map((entry) => entry.game?.id ?? "").join(",");
   const preview = (message?: string): ImportState => ({
     version,
     text,
     previewedText: text,
+    previewedMatches: matches,
     rows: matched.map(toRow),
     message,
   });
@@ -83,6 +88,9 @@ export async function importAction(
   if (form.get("intent") !== "import") return preview();
   if (form.get("previewedText") !== text) {
     return preview("The list changed, so check the matches again.");
+  }
+  if (form.get("previewedMatches") !== matches) {
+    return preview("Some matches changed, so check them again.");
   }
   const ticked = new Set(form.getAll("include").map(Number));
   const imported = await importEntries(

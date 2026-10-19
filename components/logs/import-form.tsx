@@ -79,6 +79,11 @@ export function ImportForm() {
             name="previewedText"
             value={state.previewedText}
           />
+          <input
+            type="hidden"
+            name="previewedMatches"
+            value={state.previewedMatches}
+          />
           <h2 className="text-lg font-semibold">
             {matched.length} of {rows.length} found
           </h2>
