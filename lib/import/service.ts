@@ -113,10 +113,13 @@ async function markDuplicates(
         .from(logs)
         .where(and(eq(logs.userId, userId), inArray(logs.gameId, gameIds)))
     : [];
+  const currentYear = new Date().getUTCFullYear();
   const seen = new Set(existing.map((log) => `${log.gameId}:${log.year}`));
   for (const entry of entries) {
     if (!entry.game) continue;
-    const key = `${entry.game.id}:${entry.finishedOn?.slice(0, 4) ?? ""}`;
+    // An undated play lands in the diary on the day it's imported.
+    const year = entry.finishedOn?.slice(0, 4) ?? String(currentYear);
+    const key = `${entry.game.id}:${year}`;
     entry.duplicate = seen.has(key);
     seen.add(key);
   }
@@ -143,8 +146,11 @@ export async function importEntries(
   if (candidates.length === 0) return 0;
   return db.transaction(async (tx) => {
     // Locks the player so two imports at once run one after the other, and
-    // the second sees the first's plays when it checks for duplicates.
-    await tx.execute(sql`SELECT id FROM users WHERE id = ${userId} FOR UPDATE`);
+    // the second sees the first's plays when it checks for duplicates. NO KEY
+    // leaves the row's key free for createLog's foreign-key checks.
+    await tx.execute(
+      sql`SELECT id FROM users WHERE id = ${userId} FOR NO KEY UPDATE`,
+    );
     const chosen = (await markDuplicates(tx, userId, candidates)).filter(
       (entry) => !entry.duplicate,
     );

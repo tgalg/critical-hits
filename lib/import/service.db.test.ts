@@ -148,4 +148,13 @@ describe.skipIf(!hasTestDatabase)("import", () => {
     expect(await importEntries(db, "ana", otherTab)).toBe(0);
     expect(await db.select().from(logs)).toHaveLength(2);
   });
+
+  it("treats undated entries as this year's plays when checking duplicates", async () => {
+    expect(await importEntries(db, "ana", await match("Hollow Knight"))).toBe(
+      1,
+    );
+    const again = await match("Hollow Knight");
+    expect(again[0].duplicate).toBe(true);
+    expect(await importEntries(db, "ana", again)).toBe(0);
+  });
 });
