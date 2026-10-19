@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 // A sideways-scrolling list without a visible scrollbar: touch screens swipe,
-// and devices with a mouse get arrow buttons that page through it, shown only
+// and devices with a mouse attached get arrow buttons that page through it, shown only
 // while there is more to see in that direction.
 export function ScrollRow({
   label,
@@ -85,15 +85,14 @@ function ArrowButton({
     <button
       type="button"
       aria-label={label}
-      tabIndex={-1}
       onClick={onClick}
       className={cn(
         // Covers sit above their titles, so centre on the cover, not the row.
-        "absolute top-[38%] hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border bg-background/90 text-foreground shadow-lg backdrop-blur transition pointer-fine:flex hover:bg-primary hover:text-primary-foreground",
+        "absolute top-[38%] hidden size-10 -translate-y-1/2 items-center justify-center rounded-full border bg-background/90 text-foreground shadow-lg backdrop-blur transition any-pointer-fine:flex hover:bg-primary hover:text-primary-foreground",
         direction === -1 ? "-left-3" : "-right-3",
         visible
           ? "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
-          : "pointer-events-none opacity-0",
+          : "invisible",
       )}
     >
       <svg
