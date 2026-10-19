@@ -3,6 +3,14 @@ export const profileLimits = { displayName: 50, bio: 500 };
 // Same rules as Better Auth's username plugin (lib/auth.ts).
 export const usernamePattern = /^[a-zA-Z0-9_.]{3,30}$/;
 
+export const usernameRules =
+  "Use 3 to 30 letters, numbers, underscores or dots.";
+
+// Handles generated at Discord sign-up before players were asked to pick one
+// ended in an underscore and eight hex digits.
+export const looksGenerated = (username: string) =>
+  /_[0-9a-f]{8}$/i.test(username);
+
 export type ProfileInput = {
   username: string;
   displayName: string | null;
@@ -29,7 +37,7 @@ export function parseProfileForm(form: FormLike): ParsedProfile {
   const errors: ProfileErrors = {};
   const username = text(form, "username");
   if (!usernamePattern.test(username)) {
-    errors.username = "Use 3 to 30 letters, numbers, underscores or dots.";
+    errors.username = usernameRules;
   }
   const displayName = text(form, "displayName");
   if (displayName.length > profileLimits.displayName) {

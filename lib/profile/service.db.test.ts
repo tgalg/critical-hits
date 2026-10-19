@@ -13,6 +13,7 @@ import {
   ProfileError,
   toggleFavourite,
   updateProfile,
+  updateUsername,
 } from "@/lib/profile/service";
 import {
   hasTestDatabase,
@@ -107,6 +108,25 @@ describe.skipIf(!hasTestDatabase)("profiles", () => {
     ).rejects.toThrow(ProfileError);
     expect((await getProfile(db, "ANA.plays", 2026))?.user.id).toBe("ana");
     expect(await getProfile(db, "ana", 2026)).toBeNull();
+  });
+
+  it("changes just the username and refuses a taken one", async () => {
+    await updateProfile(db, "ana", {
+      username: "ana",
+      displayName: "Ana",
+      bio: "Roguelikes.",
+      backlogPublic: false,
+    });
+    await updateUsername(db, "ana", "AnaK");
+    expect(await getAccount(db, "ana")).toEqual({
+      username: "AnaK",
+      displayName: "Ana",
+      bio: "Roguelikes.",
+      backlogPublic: false,
+    });
+    await expect(updateUsername(db, "ben", "anak")).rejects.toThrow(
+      ProfileError,
+    );
   });
 
   it("keeps up to four favourites in the order picked", async () => {

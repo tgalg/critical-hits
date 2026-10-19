@@ -1,12 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/db";
-import { parseProfileForm, type ProfileErrors } from "@/lib/profile/input";
+import {
+  parseProfileForm,
+  usernamePattern,
+  usernameRules,
+  type ProfileErrors,
+} from "@/lib/profile/input";
 import {
   ProfileError,
   toggleFavourite,
   updateProfile,
+  updateUsername,
 } from "@/lib/profile/service";
 import { requireUserId } from "@/lib/session";
 
@@ -53,6 +60,32 @@ export async function saveProfile(
   // The header, account page and every page naming the player may change.
   revalidatePath("/", "layout");
   return { status: "saved", version, message: "Saved." };
+}
+
+export type HandleFormState = { error?: string };
+
+// The pick-your-handle page: saves the username alone, then shows the player
+// their profile under it.
+export async function chooseUsername(
+  _previous: HandleFormState,
+  form: FormData,
+): Promise<HandleFormState> {
+  const userId = await requireUserId();
+  const raw = form.get("username");
+  const username = typeof raw === "string" ? raw.trim().replace(/^@/, "") : "";
+  if (!usernamePattern.test(username)) {
+    return { error: usernameRules };
+  }
+  try {
+    await updateUsername(getDatabase(), userId, username);
+  } catch (error) {
+    if (error instanceof ProfileError) {
+      return { error: error.message };
+    }
+    throw error;
+  }
+  revalidatePath("/", "layout");
+  redirect(`/u/${username}`);
 }
 
 export async function toggleFavouriteAction(form: FormData) {

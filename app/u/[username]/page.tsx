@@ -7,6 +7,7 @@ import { ReviewBody } from "@/components/logs/game-reviews";
 import { LogDetails } from "@/components/logs/log-details";
 import { getDatabase } from "@/lib/db";
 import { stars } from "@/lib/logs/input";
+import { looksGenerated } from "@/lib/profile/input";
 import { getProfile, maxFavourites } from "@/lib/profile/service";
 import { getCurrentUser } from "@/lib/session";
 import { getFollowState } from "@/lib/social/service";
@@ -92,7 +93,25 @@ export default async function ProfilePage(props: PageProps<"/u/[username]">) {
         <h1 className="text-3xl font-semibold tracking-tight">
           {user.displayName || user.username}
         </h1>
-        <p className="text-sm text-muted-foreground">@{user.username}</p>
+        <p className="text-sm text-muted-foreground">
+          @{user.username}
+          {own && (
+            <>
+              {" · "}
+              <Link href="/account/handle" className="underline">
+                Change username
+              </Link>
+            </>
+          )}
+        </p>
+        {own && looksGenerated(user.username) && (
+          <p className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm">
+            Your username was made up for you when you signed in with Discord.{" "}
+            <Link href="/account/handle" className="font-medium underline">
+              Pick your own
+            </Link>
+          </p>
+        )}
         {user.bio && (
           <p className="leading-relaxed whitespace-pre-line">{user.bio}</p>
         )}

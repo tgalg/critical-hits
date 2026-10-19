@@ -78,6 +78,8 @@ export function AuthForm({
       const result = await authClient.signIn.social({
         provider: "discord",
         callbackURL: "/account",
+        // First-time Discord players confirm the username made for them.
+        newUserCallbackURL: "/account/handle?welcome",
       });
       if (result.error) {
         setError(result.error.message || "Discord sign-in failed. Try again.");

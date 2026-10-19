@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createAuth, fallbackUsername } from "@/lib/auth";
+import { createAuth, usernameCandidates } from "@/lib/auth";
 import { accounts, sessions, users } from "@/lib/db/schema";
 import {
   hasTestDatabase,
@@ -115,20 +115,24 @@ describe.skipIf(!hasTestDatabase)("authentication", () => {
       source,
     );
     const rows = await db.select({ username: users.username }).from(users);
+    // The clean name first, then the name with a short number.
     expect(rows.map((row) => row.username)).toEqual([
-      expect.stringMatching(/^eveonline_[0-9a-f]{8}$/),
-      expect.stringMatching(/^eveonline_[0-9a-f]{8}$/),
+      "eveonline",
+      expect.stringMatching(/^eveonline\d{2}$/),
     ]);
     expect(first.id).not.toBe(second.id);
     expect(rows[0].username).not.toBe(rows[1].username);
   });
 
   it("falls back to the email or a default when the name has no usable characters", () => {
-    expect(fallbackUsername({ name: "★★", email: "Zed@x.io" })).toMatch(
-      /^player_[0-9a-f]{8}$/,
-    );
-    expect(fallbackUsername({ email: "Zed.K@x.io" })).toMatch(
-      /^zed\.k_[0-9a-f]{8}$/,
-    );
+    const first = (profile: { name?: string; email?: string }) =>
+      usernameCandidates(profile).next().value;
+    expect(first({ name: "★★", email: "Zed@x.io" })).toBe("player");
+    expect(first({ email: "Zed.K@x.io" })).toBe("zed.k");
+    expect(first({ name: "Al" })).toBe("player");
+    // Every candidate fits the username rules.
+    for (const candidate of usernameCandidates({ name: "A".repeat(40) })) {
+      expect(candidate).toMatch(/^[a-z0-9_.]{3,30}$/);
+    }
   });
 });
