@@ -32,8 +32,9 @@ const gameColumns = {
   releaseDate: games.releaseDate,
 };
 
-// The SQL side of normaliseTitle, for the accents catalog titles use.
-const normalisedTitle = sql`trim(regexp_replace(translate(lower(${games.title}), 'áàâäãåéèêëíìîïóòôöõúùûüñç', 'aaaaaaeeeeiiiiooooouuuunc'), '[^a-z0-9]+', ' ', 'g'))`;
+// The SQL side of normaliseTitle: decompose, drop the combining accents,
+// then keep only letters and digits.
+const normalisedTitle = sql`trim(regexp_replace(regexp_replace(normalize(lower(${games.title}), NFD), '[\u0300-\u036f]', '', 'g'), '[^a-z0-9]+', ' ', 'g'))`;
 
 const releaseYearIs = (year: number | null) =>
   year === null

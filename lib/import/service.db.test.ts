@@ -51,6 +51,7 @@ describe.skipIf(!hasTestDatabase)("import", () => {
           title: "Hollow Knight",
           igdbRatingCount: 2000,
         },
+        { igdbId: 6, slug: "cerny", title: "Černý Ýeti", igdbRatingCount: 1 },
         {
           igdbId: 5,
           slug: "hollow-knight-silksong",
@@ -86,6 +87,11 @@ describe.skipIf(!hasTestDatabase)("import", () => {
       match: "exact",
       game: { id: ids["hollow-knight-silksong"] },
     });
+  });
+
+  it("strips any decomposable accent on both sides", async () => {
+    const [entry] = await match("Cerny Yeti");
+    expect(entry).toMatchObject({ match: "exact", game: { id: ids.cerny } });
   });
 
   it("falls back to close matches and reports titles it can't find", async () => {

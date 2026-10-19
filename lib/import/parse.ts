@@ -44,7 +44,7 @@ function cleanLine(raw: string) {
 // "Pokemon Soul Silver" compare equal. Returns null for titles with letters
 // outside the Latin alphabet, which this can't compare without losing them.
 export function normaliseTitle(title: string) {
-  const latin = title.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+  const latin = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   if (/[^\p{ASCII}]/u.test(latin.replace(/[^\p{L}\p{N}]/gu, ""))) {
     return null;
   }
