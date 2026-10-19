@@ -65,10 +65,12 @@ describe("gamesQuery", () => {
 });
 
 describe("featuredQueries", () => {
-  it("asks for the most rated games and the most hyped around now", () => {
+  it("asks for the most rated, best rated and most hyped games", () => {
     expect(featuredQueries(new Date("2026-01-01T00:00:00Z"))).toEqual([
       `fields ${fields}; ` +
         "where game_type = (0,8,9) & cover != null & total_rating_count > 0; sort total_rating_count desc; limit 500;",
+      `fields ${fields}; ` +
+        "where game_type = (0,8,9) & cover != null & total_rating_count >= 100; sort total_rating desc; limit 500;",
       `fields ${fields}; ` +
         "where game_type = (0,8,9) & cover != null & first_release_date >= 1756857600 & first_release_date < 1782777600; sort hypes desc; limit 500;",
     ]);

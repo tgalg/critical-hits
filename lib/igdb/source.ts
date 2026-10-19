@@ -91,11 +91,13 @@ export function gamesQuery({ after, limit, updatedSince }: CatalogPage) {
 
 const day = 24 * 60 * 60 * 1000;
 
-// IGDB's page limit is 500: the most rated games of all time, and the most
-// hyped games released in the last four months or due in the next six.
+// IGDB's page limit is 500: the most rated games of all time, the best rated
+// of those with enough ratings (the same bar as the "Highly rated" row), and
+// the most hyped games released in the last four months or due in the next six.
 export function featuredQueries(now: Date) {
   return [
     query(["total_rating_count > 0"], "total_rating_count desc", 500),
+    query(["total_rating_count >= 100"], "total_rating desc", 500),
     query(
       [
         `first_release_date >= ${seconds(new Date(now.getTime() - 120 * day))}`,
