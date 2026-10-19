@@ -79,6 +79,29 @@ test("edits a profile, picks a favourite and shows it publicly", async ({
   await visitor.close();
 });
 
+test("changes the username from the profile page", async ({ page }) => {
+  const name = `handle${Date.now()}`;
+  await signUp(page, name);
+  await page.goto(`/u/${name}`);
+  await page.getByRole("link", { name: "Change username" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Change your username" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Username")).toHaveValue(name);
+
+  await page.getByLabel("Username").fill("no spaces allowed");
+  await page.getByRole("button", { name: "Save username" }).click();
+  await expect(page.locator("form").getByRole("alert")).toContainText(
+    "3 to 30 letters",
+  );
+
+  const renamed = `${name}.picked`;
+  await page.getByLabel("Username").fill(`@${renamed}`);
+  await page.getByRole("button", { name: "Save username" }).click();
+  await expect(page).toHaveURL(new RegExp(`/u/${renamed}$`, "i"));
+  await expect(page.getByText(`@${renamed}`)).toBeVisible();
+});
+
 test("shows a not-found page for an unknown player", async ({ page }) => {
   for (const path of ["/u/no-such-player-anywhere", "/u/%25"]) {
     const response = await page.goto(path);

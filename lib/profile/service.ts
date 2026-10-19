@@ -61,6 +61,29 @@ export async function updateProfile(
   }
 }
 
+// Changes only the username, for the pick-your-handle page.
+export async function updateUsername(
+  db: Database,
+  userId: string,
+  username: string,
+) {
+  try {
+    await db
+      .update(users)
+      .set({
+        username: username.toLowerCase(),
+        displayUsername: username,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new ProfileError("That username is taken.");
+    }
+    throw error;
+  }
+}
+
 // Adds the game to the player's favourite four, or removes it if it is
 // already there. The user row lock keeps two tabs from both adding a fifth.
 export async function toggleFavourite(

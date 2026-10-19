@@ -24,21 +24,39 @@ function socialProviders() {
 }
 
 // Social sign-ups arrive without a username, but users.username is required.
-// Derive one from the profile plus a random suffix; createAuth retries on the
-// rare clash. The user can change it later.
-export function fallbackUsername(profile: { name?: string; email?: string }) {
-  const base = (profile.name || profile.email?.split("@")[0] || "player")
+// Derive candidates from the profile: the clean name first, then the name
+// with a short number, and a random hex suffix only as a last resort.
+// createAuth takes the first unused one, and the player is then asked to
+// confirm or change it.
+export function usernameBase(profile: { name?: string; email?: string }) {
+  const base = (profile.name || profile.email?.split("@")[0] || "")
     .toLowerCase()
     .replace(/[^a-z0-9_.]/g, "")
     .slice(0, 20);
-  return `${base || "player"}_${randomBytes(4).toString("hex")}`;
+  return base.length >= 3 ? base : "player";
+}
+
+export function* usernameCandidates(profile: {
+  name?: string;
+  email?: string;
+}) {
+  const base = usernameBase(profile);
+  yield base;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    yield `${base}${10 + Math.floor(Math.random() * 90)}`;
+  }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    yield `${base}${1000 + Math.floor(Math.random() * 9000)}`;
+  }
+  for (let attempt = 0; attempt < 5; attempt++) {
+    yield `${base}_${randomBytes(4).toString("hex")}`;
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
 export function createAuth(db: NodePgDatabase<any>) {
   async function unusedUsername(profile: { name?: string; email?: string }) {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const candidate = fallbackUsername(profile);
+    for (const candidate of usernameCandidates(profile)) {
       const [taken] = await db
         .select({ id: users.id })
         .from(users)
