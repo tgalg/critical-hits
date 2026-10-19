@@ -143,7 +143,8 @@ export async function importEntries(
     .filter((entry) => entry.game)
     .sort(
       (a, b) =>
-        (a.finishedOn ?? "").localeCompare(b.finishedOn ?? "") ||
+        // Undated plays land on today, after every dated one.
+        (a.finishedOn ?? "9999").localeCompare(b.finishedOn ?? "9999") ||
         a.index - b.index,
     )
     .map((entry) => ({ ...entry }));
