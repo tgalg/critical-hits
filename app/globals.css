@@ -87,3 +87,11 @@
     font-family: Arial, Helvetica, sans-serif;
   }
 }
+
+/* Scrollable rows that page with buttons instead of a native scrollbar. */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

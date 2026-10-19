@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { GameCover } from "@/components/catalog/game-cover";
+import { ScrollRow } from "@/components/catalog/scroll-row";
 import type { BrowseRow } from "@/lib/catalog/queries";
 
-// A titled row of covers that scrolls sideways on narrow screens.
+// A titled row of covers that scrolls sideways.
 export function GameRow({ row }: { row: BrowseRow }) {
   return (
     <section aria-labelledby={row.id} className="space-y-3">
       <h2 id={row.id} className="text-xl font-semibold">
         {row.title}
       </h2>
-      <ul className="-mx-6 flex snap-x scroll-px-6 gap-4 overflow-x-auto px-6 pb-2">
+      <ScrollRow
+        label={row.title}
+        className="-mx-6 flex snap-x scroll-px-6 gap-4 px-6 pb-2"
+      >
         {row.games.map((game) => (
           <li key={game.slug} className="w-28 shrink-0 snap-start sm:w-36">
             <Link
@@ -28,7 +32,7 @@ export function GameRow({ row }: { row: BrowseRow }) {
             </Link>
           </li>
         ))}
-      </ul>
+      </ScrollRow>
     </section>
   );
 }
