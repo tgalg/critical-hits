@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createIgdbClient } from "@/lib/igdb/client";
-import { gamesQuery, mapIgdbGame, type IgdbGame } from "@/lib/igdb/source";
+import {
+  featuredQueries,
+  gamesQuery,
+  mapIgdbGame,
+  type IgdbGame,
+} from "@/lib/igdb/source";
 import fixture from "@/lib/igdb/__fixtures__/games.json";
 
 const games = fixture as IgdbGame[];
@@ -23,6 +28,7 @@ describe("mapIgdbGame", () => {
         { igdbId: 12, name: "Role-playing (RPG)" },
         { igdbId: 31, name: "Adventure" },
       ],
+      popularity: { rating: 92.85, ratingCount: 3125, hypes: 40 },
     });
   });
 
@@ -34,10 +40,14 @@ describe("mapIgdbGame", () => {
       summary: null,
       platforms: [],
       genres: [],
+      popularity: { rating: null, ratingCount: 0, hypes: 0 },
     });
     expect(mapIgdbGame(games[1]).platforms[1].abbreviation).toBeNull();
   });
 });
+
+const fields =
+  "name,slug,summary,first_release_date,cover.image_id,platforms.name,platforms.abbreviation,genres.name,total_rating,total_rating_count,hypes";
 
 describe("gamesQuery", () => {
   it("pages by id and filters by type, cover and update time", () => {
@@ -48,9 +58,20 @@ describe("gamesQuery", () => {
         updatedSince: new Date("2026-01-01T00:00:00Z"),
       }),
     ).toBe(
-      "fields name,slug,summary,first_release_date,cover.image_id,platforms.name,platforms.abbreviation,genres.name; " +
-        "where id > 10 & game_type = (0,8,9) & cover != null & updated_at >= 1767225600; sort id asc; limit 500;",
+      `fields ${fields}; ` +
+        "where game_type = (0,8,9) & cover != null & id > 10 & updated_at >= 1767225600; sort id asc; limit 500;",
     );
+  });
+});
+
+describe("featuredQueries", () => {
+  it("asks for the most rated games and the most hyped around now", () => {
+    expect(featuredQueries(new Date("2026-01-01T00:00:00Z"))).toEqual([
+      `fields ${fields}; ` +
+        "where game_type = (0,8,9) & cover != null & total_rating_count > 0; sort total_rating_count desc; limit 500;",
+      `fields ${fields}; ` +
+        "where game_type = (0,8,9) & cover != null & first_release_date >= 1756857600 & first_release_date < 1782777600; sort hypes desc; limit 500;",
+    ]);
   });
 });
 

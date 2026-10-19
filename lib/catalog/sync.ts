@@ -20,6 +20,11 @@ const gameRow = (game: CatalogGame) => ({
   coverUrl: game.coverUrl,
   releaseDate: game.releaseDate,
   summary: game.summary,
+  ...(game.popularity && {
+    igdbRating: game.popularity.rating?.toFixed(2) ?? null,
+    igdbRatingCount: game.popularity.ratingCount,
+    igdbHypes: game.popularity.hypes,
+  }),
 });
 
 const excluded = (column: AnyColumn) => sql.raw(`excluded."${column.name}"`);
@@ -51,21 +56,35 @@ export async function upsertCatalogGames(db: Database, batch: CatalogGame[]) {
       for (const row of rows) platformIds.set(row.igdbId, row.id);
     }
 
-    const gameRows = await tx
-      .insert(games)
-      .values(batch.map(gameRow))
-      .onConflictDoUpdate({
-        target: games.igdbId,
-        set: {
-          slug: excluded(games.slug),
-          title: excluded(games.title),
-          coverUrl: excluded(games.coverUrl),
-          releaseDate: excluded(games.releaseDate),
-          summary: excluded(games.summary),
-        },
-      })
-      .returning({ id: games.id, igdbId: games.igdbId });
-    const gameIds = new Map(gameRows.map((row) => [row.igdbId, row.id]));
+    // A source that doesn't know popularity leaves it out; only games that
+    // came with it have theirs replaced, so they go in a separate statement.
+    const gameIds = new Map<number, number>();
+    for (const withPopularity of [true, false]) {
+      const group = batch.filter(
+        (game) => !!game.popularity === withPopularity,
+      );
+      if (group.length === 0) continue;
+      const rows = await tx
+        .insert(games)
+        .values(group.map(gameRow))
+        .onConflictDoUpdate({
+          target: games.igdbId,
+          set: {
+            slug: excluded(games.slug),
+            title: excluded(games.title),
+            coverUrl: excluded(games.coverUrl),
+            releaseDate: excluded(games.releaseDate),
+            summary: excluded(games.summary),
+            ...(withPopularity && {
+              igdbRating: excluded(games.igdbRating),
+              igdbRatingCount: excluded(games.igdbRatingCount),
+              igdbHypes: excluded(games.igdbHypes),
+            }),
+          },
+        })
+        .returning({ id: games.id, igdbId: games.igdbId });
+      for (const row of rows) gameIds.set(row.igdbId, row.id);
+    }
 
     await tx
       .delete(gamePlatforms)
@@ -186,8 +205,10 @@ export async function saveBackfillProgress(
 const day = 24 * 60 * 60 * 1000;
 
 // The nightly job: first games IGDB changed in the last two days, so one
-// missed run is covered by the next; then, with the time left, the full
-// backfill continues from where the last run stopped until it reaches the end.
+// missed run is covered by the next; then the featured games, whose ratings
+// and hype move daily without always counting as a change; then, with the
+// time left, the full backfill continues from where the last run stopped until
+// it reaches the end.
 export async function runNightlySync(
   db: Database,
   source: CatalogSource,
@@ -209,12 +230,19 @@ export async function runNightlySync(
     pageSize,
   });
 
+  let featured = 0;
+  if (source.fetchFeatured && Date.now() < deadline) {
+    const batch = await source.fetchFeatured(new Date(now));
+    await upsertCatalogGames(db, batch);
+    featured = batch.length;
+  }
+
   const [saved] = await db
     .select()
     .from(syncCursors)
     .where(eq(syncCursors.name, backfillCursor));
   if (saved?.done || Date.now() >= deadline) {
-    return { updated, backfill: saved ?? null };
+    return { updated, featured, backfill: saved ?? null };
   }
   const result = await syncCatalog(db, source, {
     after: saved?.cursor ?? 0,
@@ -228,5 +256,5 @@ export async function runNightlySync(
     done: result.done,
   };
   await saveBackfillProgress(db, backfill);
-  return { updated, backfill };
+  return { updated, featured, backfill };
 }

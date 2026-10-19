@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { GameCover } from "@/components/catalog/game-cover";
-import { releaseYear, searchGames } from "@/lib/catalog/queries";
+import { GameRow } from "@/components/catalog/game-row";
+import { getBrowseRows, releaseYear, searchGames } from "@/lib/catalog/queries";
 import { getDatabase } from "@/lib/db";
 
 export const metadata: Metadata = { title: "Games · Critical Hits" };
@@ -10,6 +11,8 @@ export default async function GamesPage(props: PageProps<"/games">) {
   const { q } = await props.searchParams;
   const query = typeof q === "string" ? q : "";
   const results = query ? await searchGames(getDatabase(), query) : [];
+  // Without a search, show rows of games to start logging from.
+  const rows = query ? [] : await getBrowseRows(getDatabase());
 
   return (
     <main className="mx-auto max-w-5xl space-y-8 px-6 py-12">
@@ -58,6 +61,9 @@ export default async function GamesPage(props: PageProps<"/games">) {
           ))}
         </ul>
       )}
+      {rows.map((row) => (
+        <GameRow key={row.id} row={row} />
+      ))}
     </main>
   );
 }
