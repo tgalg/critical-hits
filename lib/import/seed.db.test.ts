@@ -148,7 +148,7 @@ describe.skipIf(!hasTestDatabase)("seedPlays", () => {
     expect(result).toMatchObject({ status: "done", added: 2 });
   });
 
-  it("keeps a newer play's rating as the player's current one", async () => {
+  it("fits old plays in before a newer one, keeping its rating", async () => {
     await db.insert(logs).values({
       userId: "tom",
       gameId: ids["hollow-knight"],
@@ -162,5 +162,11 @@ describe.skipIf(!hasTestDatabase)("seedPlays", () => {
       .from(games)
       .where(eq(games.id, ids["hollow-knight"]));
     expect(knight.avg).toBe("4.00");
+    const knightPlays = await db
+      .select({ finishedOn: logs.finishedOn, isReplay: logs.isReplay })
+      .from(logs)
+      .where(eq(logs.gameId, ids["hollow-knight"]))
+      .orderBy(logs.finishedOn);
+    expect(knightPlays.map((p) => p.isReplay)).toEqual([false, true, true]);
   });
 });

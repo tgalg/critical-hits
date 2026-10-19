@@ -116,16 +116,23 @@ export async function seedPlays(
       await markDuplicates(tx as Database, user.id, candidates)
     ).filter((entry) => !entry.duplicate);
     const gameIds = [...new Set(chosen.map((entry) => entry.game!.id))];
-    const played = new Set(
+    // Each game's earliest play by diary date, so a seeded play is a replay
+    // only when the player had already played the game before it.
+    const diaryDate = sql<string>`coalesce(${logs.finishedOn}, ${logs.startedOn}, (${logs.createdAt} AT TIME ZONE 'UTC')::date)::text`;
+    const firstPlayed = new Map(
       gameIds.length
         ? (
             await tx
-              .select({ gameId: logs.gameId })
+              .select({
+                gameId: logs.gameId,
+                first: sql<string>`min(${diaryDate})`,
+              })
               .from(logs)
               .where(
                 and(eq(logs.userId, user.id), inArray(logs.gameId, gameIds)),
               )
-          ).map((log) => log.gameId)
+              .groupBy(logs.gameId)
+          ).map((log) => [log.gameId, log.first])
         : [],
     );
     const reviewed = new Set(
@@ -165,6 +172,8 @@ export async function seedPlays(
       const playedAt = entry.finishedOn
         ? new Date(`${entry.finishedOn}T12:00:00Z`)
         : undefined;
+      const day = entry.finishedOn ?? today;
+      const first = firstPlayed.get(gameId);
       const [log] = await tx
         .insert(logs)
         .values({
@@ -176,11 +185,26 @@ export async function seedPlays(
           finishedOn: entry.finishedOn,
           hours: play.hours === undefined ? null : String(play.hours),
           rating: play.rating ?? null,
-          isReplay: played.has(gameId),
+          isReplay: first !== undefined && first <= day,
           createdAt: playedAt,
         })
         .returning({ id: logs.id });
-      played.add(gameId);
+      if (first === undefined || day < first) {
+        // The player's later plays of this game are replays now.
+        await tx
+          .update(logs)
+          .set({ isReplay: true })
+          .where(
+            and(
+              eq(logs.userId, user.id),
+              eq(logs.gameId, gameId),
+              eq(logs.isReplay, false),
+              sql`${logs.id} <> ${log.id}`,
+              sql`${diaryDate} > ${day}`,
+            ),
+          );
+        firstPlayed.set(gameId, day);
+      }
       // A player reviews a game once, on the first play that has one.
       if (play.review?.trim() && !reviewed.has(gameId)) {
         await tx.insert(reviews).values({
