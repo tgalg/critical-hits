@@ -84,8 +84,11 @@ export default async function Home(props: PageProps<"/">) {
               </p>
               <PlayerSearch />
               {popular.length > 0 && (
-                <section aria-labelledby="popular" className="space-y-4 pt-4">
-                  <h3 id="popular" className="text-xl font-semibold">
+                <section
+                  aria-labelledby="popular-reviews"
+                  className="space-y-4 pt-4"
+                >
+                  <h3 id="popular-reviews" className="text-xl font-semibold">
                     Popular reviews
                   </h3>
                   <GameReviews
