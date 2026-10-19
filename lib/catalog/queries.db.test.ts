@@ -130,6 +130,11 @@ describe.skipIf(!hasTestDatabase)("catalog queries", () => {
         ),
         add("soon", { rating: null, ratingCount: 0, hypes: 80 }, "2026-12-01"),
         add(
+          "far-off",
+          { rating: null, ratingCount: 0, hypes: 999 },
+          "2028-01-01",
+        ),
+        add(
           "no-cover",
           { rating: 99, ratingCount: 9000, hypes: 0 },
           "2010-01-01",

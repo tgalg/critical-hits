@@ -7,6 +7,7 @@ import {
   gte,
   ilike,
   isNotNull,
+  lt,
   lte,
   or,
   sql,
@@ -61,7 +62,9 @@ const isoDate = (time: number) => new Date(time).toISOString().slice(0, 10);
 
 // Rows of covers for the Games page, so players have something to log before
 // anyone they follow has. Until the site has ratings of its own they lean on
-// IGDB's counts; rows with nothing in them are left out.
+// IGDB's counts; rows with nothing in them are left out. Each row's order and
+// date window match a page of the nightly featured refresh (see
+// featuredQueries in lib/igdb/source.ts), so its top games are kept current.
 export async function getBrowseRows(
   db: Database,
   { now = Date.now(), limit = 12 }: { now?: number; limit?: number } = {},
@@ -74,7 +77,6 @@ export async function getBrowseRows(
       .where(and(isNotNull(games.coverUrl), ...where))
       .orderBy(...order.map((column) => desc(column)), asc(games.title))
       .limit(limit);
-  const interest = sql`${games.igdbHypes} + ${games.igdbRatingCount}`;
 
   const [popular, highlyRated, newReleases, comingSoon] = await Promise.all([
     rows(
@@ -92,13 +94,17 @@ export async function getBrowseRows(
       [
         lte(games.releaseDate, today),
         gt(games.releaseDate, isoDate(now - 90 * day)),
-        gt(interest, 0),
+        gt(games.igdbHypes, 0),
       ],
-      interest,
+      games.igdbHypes,
       games.releaseDate,
     ),
     rows(
-      [gt(games.releaseDate, today), gt(games.igdbHypes, 0)],
+      [
+        gt(games.releaseDate, today),
+        lt(games.releaseDate, isoDate(now + 180 * day)),
+        gt(games.igdbHypes, 0),
+      ],
       games.igdbHypes,
     ),
   ]);
