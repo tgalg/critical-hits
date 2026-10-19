@@ -10,7 +10,7 @@ import {
   users,
 } from "@/lib/db/schema";
 import { parseImportText } from "@/lib/import/parse";
-import { matchEntries } from "@/lib/import/service";
+import { markDuplicates, matchEntries } from "@/lib/import/service";
 import { recomputeGameRating } from "@/lib/logs/service";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- any schema-typed Drizzle database works here
@@ -100,18 +100,22 @@ export async function seedPlays(
     // player logs meanwhile is seen as a duplicate.
     const matched = await matchEntries(tx as Database, user.id, entries);
     // Nobody checks the matches of a seed, so only exact titles count.
-    const chosen = matched.filter(
-      (entry) => entry.match === "exact" && !entry.duplicate,
-    );
-    const gameIds = [...new Set(chosen.map((entry) => entry.game!.id))];
-    if (gameIds.length) {
+    const candidates = matched.filter((entry) => entry.match === "exact");
+    const lockIds = [...new Set(candidates.map((entry) => entry.game!.id))];
+    if (lockIds.length) {
+      // Locks the games, in id order, then checks for duplicates again, so a
+      // play logged from a game page meanwhile commits first and is seen.
       await tx.execute(
         sql`SELECT id FROM games WHERE id IN (${sql.join(
-          gameIds.map((id) => sql`${id}`),
+          lockIds.map((id) => sql`${id}`),
           sql`, `,
         )}) ORDER BY id FOR UPDATE`,
       );
     }
+    const chosen = (
+      await markDuplicates(tx as Database, user.id, candidates)
+    ).filter((entry) => !entry.duplicate);
+    const gameIds = [...new Set(chosen.map((entry) => entry.game!.id))];
     const played = new Set(
       gameIds.length
         ? (
@@ -167,6 +171,11 @@ export async function seedPlays(
           hours: play.hours === undefined ? null : String(play.hours),
           rating: play.rating ?? null,
           isReplay: played.has(gameId),
+          // Dated as when the play happened, so a game's average keeps
+          // counting a newer play's rating over this older one's.
+          ...(entry.finishedOn && {
+            createdAt: new Date(`${entry.finishedOn}T12:00:00Z`),
+          }),
         })
         .returning({ id: logs.id });
       played.add(gameId);
