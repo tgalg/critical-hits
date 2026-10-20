@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createIgdbClient } from "@/lib/igdb/client";
 import {
   featuredQueries,
+  fetchIgdbGamesBySlug,
   gamesQuery,
   mapIgdbGame,
   type IgdbGame,
@@ -122,5 +123,25 @@ describe("createIgdbClient", () => {
     );
     expect(third.auth).not.toBe("Bearer token1");
     expect(calls.filter((url) => url.includes("twitch"))).toHaveLength(2);
+  });
+});
+
+describe("fetchIgdbGamesBySlug", () => {
+  it("asks for the slugs whatever their game type", async () => {
+    const bodies: string[] = [];
+    const found = await fetchIgdbGamesBySlug(
+      {
+        async query<T>(_endpoint: string, body: string) {
+          bodies.push(body);
+          return [games[0]] as T[];
+        },
+      },
+      ["the-witcher-3-wild-hunt"],
+    );
+    expect(bodies[0]).toMatch(
+      /where slug = \("the-witcher-3-wild-hunt"\); limit 1;$/,
+    );
+    expect(bodies[0]).not.toContain("game_type");
+    expect(found.map((game) => game.slug)).toEqual(["the-witcher-3-wild-hunt"]);
   });
 });

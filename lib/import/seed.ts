@@ -3,6 +3,7 @@ import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import {
   backlogItems,
   gamePlatforms,
+  games,
   logs,
   oneOffJobs,
   platforms,
@@ -33,7 +34,7 @@ export type SeedPlay = {
 };
 
 export type SeedResult =
-  | { status: "done"; added: number; missing: string[] }
+  | { status: "done"; added: number; missing: string[]; moved?: number }
   | { status: "skipped"; reason: string };
 
 // Loads a player's past plays once, as a one-off job named `job`. Like an
@@ -232,6 +233,94 @@ export async function seedPlays(
       status: "done" as const,
       added: chosen.length,
       missing: matched.filter((e) => e.match !== "exact").map((e) => e.line),
+    };
+  });
+}
+
+// Moves a player's plays of one game onto another edition of it, then adds
+// one more finished play of that edition, once, as the one-off job `job`.
+// Skips, to be tried again, until both games are in the catalog.
+export async function moveToEdition(
+  db: Database,
+  job: string,
+  email: string,
+  {
+    from,
+    to,
+    addFinishedOn,
+  }: { from: string; to: string; addFinishedOn: string },
+): Promise<SeedResult> {
+  const [user] = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(
+      and(
+        sql`lower(${users.email}) = ${email.toLowerCase()}`,
+        eq(users.emailVerified, true),
+      ),
+    );
+  if (!user) return { status: "skipped", reason: "no verified user" };
+  const editions = await db
+    .select({ id: games.id, slug: games.slug })
+    .from(games)
+    .where(inArray(games.slug, [from, to]));
+  const fromId = editions.find((game) => game.slug === from)?.id;
+  const toId = editions.find((game) => game.slug === to)?.id;
+  if (fromId === undefined || toId === undefined) {
+    return { status: "skipped", reason: "edition not in the catalog" };
+  }
+
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      sql`SELECT id FROM users WHERE id = ${user.id} FOR NO KEY UPDATE`,
+    );
+    const inserted = await tx
+      .insert(oneOffJobs)
+      .values({ name: job })
+      .onConflictDoNothing()
+      .returning({ name: oneOffJobs.name });
+    if (inserted.length === 0) {
+      return { status: "skipped" as const, reason: "already ran" };
+    }
+    await tx.execute(
+      sql`SELECT id FROM games WHERE id IN (${fromId}, ${toId}) ORDER BY id FOR UPDATE`,
+    );
+    const moved = await tx
+      .update(logs)
+      .set({ gameId: toId, platformId: null })
+      .where(and(eq(logs.userId, user.id), eq(logs.gameId, fromId)))
+      .returning({ id: logs.id });
+    const [earlier] = await tx
+      .select({ id: logs.id })
+      .from(logs)
+      .where(
+        and(
+          eq(logs.userId, user.id),
+          eq(logs.gameId, toId),
+          sql`coalesce(${logs.finishedOn}, ${logs.startedOn}, (${logs.createdAt} AT TIME ZONE 'UTC')::date) <= ${addFinishedOn}`,
+        ),
+      )
+      .limit(1);
+    await tx.insert(logs).values({
+      userId: user.id,
+      gameId: toId,
+      status: "finished",
+      finishedOn: addFinishedOn,
+      isReplay: !!earlier,
+      createdAt: new Date(`${addFinishedOn}T12:00:00Z`),
+    });
+    await tx
+      .delete(backlogItems)
+      .where(
+        and(eq(backlogItems.userId, user.id), eq(backlogItems.gameId, toId)),
+      );
+    await recomputeGameRating(tx as Database, fromId);
+    await recomputeGameRating(tx as Database, toId);
+    return {
+      status: "done" as const,
+      added: 1,
+      missing: [],
+      moved: moved.length,
     };
   });
 }
