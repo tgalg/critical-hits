@@ -185,6 +185,17 @@ describe.skipIf(!hasTestDatabase)("seedPlays", () => {
       .insert(games)
       .values({ igdbId: 9, slug: "voidheart", title: "Voidheart Edition" })
       .returning({ id: games.id });
+    expect(await move()).toEqual({
+      status: "skipped",
+      reason: "no plays to move",
+    });
+    // Already loaded on the edition, as a first play.
+    await db.insert(logs).values({
+      userId: "tom",
+      gameId: voidheart.id,
+      status: "finished",
+      finishedOn: "2026-03-01",
+    });
     const [log] = await db
       .insert(logs)
       .values({
@@ -197,7 +208,7 @@ describe.skipIf(!hasTestDatabase)("seedPlays", () => {
       .returning({ id: logs.id });
     await db.insert(reviews).values({ logId: log.id, body: "Good." });
 
-    expect(await move()).toMatchObject({ status: "done", moved: 1 });
+    expect(await move()).toMatchObject({ status: "done", added: 0, moved: 1 });
     expect(await move()).toMatchObject({ status: "skipped" });
     const plays = await db
       .select({
@@ -218,7 +229,7 @@ describe.skipIf(!hasTestDatabase)("seedPlays", () => {
       },
       {
         gameId: voidheart.id,
-        finishedOn: "2026-09-13",
+        finishedOn: "2026-03-01",
         isReplay: true,
         review: null,
       },

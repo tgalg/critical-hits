@@ -274,6 +274,15 @@ export async function moveToEdition(
     await tx.execute(
       sql`SELECT id FROM users WHERE id = ${user.id} FOR NO KEY UPDATE`,
     );
+    // Waits until there's a play to move, so the job can't finish before
+    // the plays it's for have been loaded.
+    const [source] = await tx
+      .select({ id: logs.id })
+      .from(logs)
+      .where(and(eq(logs.userId, user.id), eq(logs.gameId, fromId)))
+      .limit(1);
+    if (!source)
+      return { status: "skipped" as const, reason: "no plays to move" };
     const inserted = await tx
       .insert(oneOffJobs)
       .values({ name: job })
@@ -290,6 +299,18 @@ export async function moveToEdition(
       .set({ gameId: toId, platformId: null })
       .where(and(eq(logs.userId, user.id), eq(logs.gameId, fromId)))
       .returning({ id: logs.id });
+    const diaryDate = sql`coalesce(${logs.finishedOn}, ${logs.startedOn}, (${logs.createdAt} AT TIME ZONE 'UTC')::date)`;
+    const [sameYear] = await tx
+      .select({ id: logs.id })
+      .from(logs)
+      .where(
+        and(
+          eq(logs.userId, user.id),
+          eq(logs.gameId, toId),
+          sql`extract(year from ${diaryDate}) = ${Number(addFinishedOn.slice(0, 4))}`,
+        ),
+      )
+      .limit(1);
     const [earlier] = await tx
       .select({ id: logs.id })
       .from(logs)
@@ -297,18 +318,26 @@ export async function moveToEdition(
         and(
           eq(logs.userId, user.id),
           eq(logs.gameId, toId),
-          sql`coalesce(${logs.finishedOn}, ${logs.startedOn}, (${logs.createdAt} AT TIME ZONE 'UTC')::date) <= ${addFinishedOn}`,
+          sql`${diaryDate} < ${addFinishedOn}`,
         ),
       )
       .limit(1);
-    await tx.insert(logs).values({
-      userId: user.id,
-      gameId: toId,
-      status: "finished",
-      finishedOn: addFinishedOn,
-      isReplay: !!earlier,
-      createdAt: new Date(`${addFinishedOn}T12:00:00Z`),
-    });
+    // A play of that year already on the edition is the one to add.
+    if (sameYear) {
+      await tx
+        .update(logs)
+        .set({ isReplay: !!earlier })
+        .where(eq(logs.id, sameYear.id));
+    } else {
+      await tx.insert(logs).values({
+        userId: user.id,
+        gameId: toId,
+        status: "finished",
+        finishedOn: addFinishedOn,
+        isReplay: !!earlier,
+        createdAt: new Date(`${addFinishedOn}T12:00:00Z`),
+      });
+    }
     await tx
       .delete(backlogItems)
       .where(
@@ -318,7 +347,7 @@ export async function moveToEdition(
     await recomputeGameRating(tx as Database, toId);
     return {
       status: "done" as const,
-      added: 1,
+      added: sameYear ? 0 : 1,
       missing: [],
       moved: moved.length,
     };
