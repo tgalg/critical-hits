@@ -113,6 +113,20 @@ export function featuredQueries(now: Date) {
   ];
 }
 
+// Specific games by IGDB slug, whatever their game type, for adding an
+// edition the catalog's sync leaves out.
+export async function fetchIgdbGamesBySlug(
+  client: IgdbClient,
+  slugs: string[],
+): Promise<CatalogGame[]> {
+  const list = slugs.map((slug) => JSON.stringify(slug)).join(",");
+  const games = await client.query<IgdbGame>(
+    "games",
+    `fields ${fields}; where slug = (${list}); limit ${slugs.length};`,
+  );
+  return games.map(mapIgdbGame);
+}
+
 export function createIgdbSource(client: IgdbClient): CatalogSource {
   return {
     async fetchGames(page) {

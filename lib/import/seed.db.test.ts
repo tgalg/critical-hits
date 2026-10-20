@@ -10,7 +10,7 @@ import {
   reviews,
   users,
 } from "@/lib/db/schema";
-import { seedPlays } from "@/lib/import/seed";
+import { moveToEdition, seedPlays } from "@/lib/import/seed";
 import {
   hasTestDatabase,
   openTestDatabase,
@@ -168,5 +168,76 @@ describe.skipIf(!hasTestDatabase)("seedPlays", () => {
       .where(eq(logs.gameId, ids["hollow-knight"]))
       .orderBy(logs.finishedOn);
     expect(knightPlays.map((p) => p.isReplay)).toEqual([false, true, true]);
+  });
+
+  it("moves plays onto another edition once, adding a later replay", async () => {
+    const move = () =>
+      moveToEdition(db, "edition", "tom@example.com", {
+        from: "hollow-knight",
+        to: "voidheart",
+        addFinishedOn: "2026-09-13",
+      });
+    expect(await move()).toEqual({
+      status: "skipped",
+      reason: "edition not in the catalog",
+    });
+    const [voidheart] = await db
+      .insert(games)
+      .values({ igdbId: 9, slug: "voidheart", title: "Voidheart Edition" })
+      .returning({ id: games.id });
+    expect(await move()).toEqual({
+      status: "skipped",
+      reason: "no plays to move",
+    });
+    // Already loaded on the edition, as a first play.
+    await db.insert(logs).values({
+      userId: "tom",
+      gameId: voidheart.id,
+      status: "finished",
+      finishedOn: "2026-03-01",
+    });
+    const [log] = await db
+      .insert(logs)
+      .values({
+        userId: "tom",
+        gameId: ids["hollow-knight"],
+        status: "finished",
+        finishedOn: "2021-05-01",
+        rating: 7,
+      })
+      .returning({ id: logs.id });
+    await db.insert(reviews).values({ logId: log.id, body: "Good." });
+
+    expect(await move()).toMatchObject({ status: "done", added: 0, moved: 1 });
+    expect(await move()).toMatchObject({ status: "skipped" });
+    const plays = await db
+      .select({
+        gameId: logs.gameId,
+        finishedOn: logs.finishedOn,
+        isReplay: logs.isReplay,
+        review: reviews.body,
+      })
+      .from(logs)
+      .leftJoin(reviews, eq(reviews.logId, logs.id))
+      .orderBy(logs.finishedOn);
+    expect(plays).toEqual([
+      {
+        gameId: voidheart.id,
+        finishedOn: "2021-05-01",
+        isReplay: false,
+        review: "Good.",
+      },
+      {
+        gameId: voidheart.id,
+        finishedOn: "2026-03-01",
+        isReplay: true,
+        review: null,
+      },
+    ]);
+    const ratings = await db
+      .select({ slug: games.slug, avg: games.avgRating })
+      .from(games)
+      .where(eq(games.ratingCount, 1));
+    expect(ratings).toEqual([{ slug: "voidheart", avg: "7.00" }]);
   });
 });
